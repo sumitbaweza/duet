@@ -13,12 +13,10 @@ pick another, including in `deploy/Caddyfile`, `deploy/turnserver.conf` and `dep
 
 ---
 
-## 1. Put the code on GitHub
+## 1. Code on GitHub ✓
 
-The server downloads the code from GitHub, which also makes updates a single command later.
-A **public** repo is simplest. For a **private** one, add a
-[deploy key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys) for the server.
-`node_modules/` and `test-media/` are already excluded by `.gitignore`.
+Done: the code is at **https://github.com/sumitbaweza/duet** (public), and the server downloads it from there.
+After you change something locally, `git push` it, then run the update command at the end of this guide on the server.
 
 ## 2. Create the server
 
@@ -77,11 +75,11 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /
 apt update && apt install -y caddy
 ```
 
-**The app** (replace the GitHub URL with yours)
+**The app**
 
 ```bash
 useradd --system --create-home --shell /usr/sbin/nologin duet
-git clone https://github.com/YOUR_USERNAME/duet.git /opt/duet
+git clone https://github.com/sumitbaweza/duet.git /opt/duet
 chown -R duet:duet /opt/duet
 cd /opt/duet && sudo -u duet npm ci --omit=dev
 ```
