@@ -46,6 +46,13 @@ ssh root@YOUR_SERVER_IP
 
 Then run these blocks in order (copy and paste each block).
 
+**Swap (1 GB servers)**: disk-backed spare memory so installs don't run out of RAM
+
+```bash
+fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+```
+
 **Updates and firewall**
 
 ```bash
