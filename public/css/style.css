@@ -132,16 +132,25 @@ svg { width: 22px; height: 22px; flex: none; }
   70% { box-shadow: 0 0 0 14px rgb(255 79 139 / 0), 0 10px 30px rgb(255 79 139 / 0.25); }
   100% { box-shadow: 0 0 0 0 rgb(255 79 139 / 0), 0 10px 30px rgb(255 79 139 / 0.25); }
 }
+.brand {
+  display: inline-flex; align-items: center; gap: 12px; color: inherit; text-decoration: none;
+  font-family: "Space Grotesk", var(--font); font-weight: 700; font-size: 40px; line-height: 1; letter-spacing: -0.045em;
+}
+.brand img { width: 48px; height: 48px; border-radius: 14px; box-shadow: 0 8px 24px rgb(255 79 139 / 0.35); }
+.brand span {
+  background: linear-gradient(180deg, #fff 35%, #ffc2d6); -webkit-background-clip: text; background-clip: text; color: transparent;
+  padding-bottom: 2px; /* keep descender-free gradient text from clipping */
+}
+/* Phones: logo and "App By" button share one row (these must come after the base .brand rules). */
 @media (max-width: 420px) {
   .home-nav { gap: 10px; flex-wrap: nowrap; justify-content: space-between; }
-  .brand { font-size: 18px; gap: 8px; }
-  .brand img { width: 28px; height: 28px; }
+  .brand { font-size: 26px; gap: 7px; }
+  .brand img { width: 34px; height: 34px; border-radius: 10px; }
   .maker { gap: 8px; padding: 5px 6px 5px 14px; }
   .maker-text b { font-size: 12px; white-space: nowrap; }
   .maker-text small { font-size: 9px; letter-spacing: 0.18em; }
   .maker-arrow { width: 24px; height: 24px; font-size: 13px; }
 }
-.brand { display: inline-flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
 
 .hero {
   position: relative; max-width: 1120px; margin: 4vh auto 0;
@@ -463,6 +472,11 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; bo
 @media (max-width: 380px) {
   #partner-name { display: none; }
   .avatar { margin-left: -4px; }
+}
+@media (max-width: 360px) {
+  .home { padding-left: 14px; padding-right: 14px; }
+  .brand { font-size: 22px; }
+  .brand img { width: 30px; height: 30px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
