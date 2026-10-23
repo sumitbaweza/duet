@@ -381,6 +381,24 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; bo
   100% { transform: translateY(-340px) scale(1); opacity: 0; }
 }
 
+/* Quality menu */
+.quality-wrap { position: relative; }
+#quality-btn { position: relative; }
+.quality-badge {
+  position: absolute; right: 1px; top: 3px; padding: 0 4px; border-radius: 5px; line-height: 14px;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.02em; background: var(--accent); color: #fff;
+}
+.quality-badge:empty { display: none; }
+.quality-pop {
+  position: absolute; bottom: 52px; right: -8px; min-width: 170px; padding: 6px; display: grid; gap: 2px;
+  border-radius: 14px; background: var(--surface-solid); border: 1px solid var(--line); box-shadow: var(--shadow);
+  animation: pop2 0.18s var(--ease);
+}
+.q-opt { text-align: left; padding: 9px 12px; border-radius: 9px; font-size: 14px; font-weight: 500; }
+.q-opt:hover { background: rgb(255 255 255 / 0.08); }
+.q-opt.active { background: rgb(255 79 139 / 0.18); color: #fff; font-weight: 700; }
+.q-opt.active::after { content: '✓'; float: right; color: var(--accent); }
+
 /* Stats sheet */
 .stats {
   position: absolute; z-index: 8; top: 70px; right: max(14px, env(safe-area-inset-right)); width: min(320px, calc(100% - 28px));

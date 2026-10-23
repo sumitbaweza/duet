@@ -38,6 +38,7 @@
       <symbol id="i-x" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
       <symbol id="i-sync" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4V1L8 5l4 4V6a6 6 0 0 1 5.66 8l1.46 1.46A8 8 0 0 0 12 4zm0 14a6 6 0 0 1-5.66-8L4.88 8.54A8 8 0 0 0 12 20v3l4-4-4-4v3z"/></symbol>
       <symbol id="i-lock" viewBox="0 0 24 24"><path fill="currentColor" d="M18 8h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3.1-9H8.9V6a3.1 3.1 0 0 1 6.2 0v2z"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></symbol>
       <symbol id="i-heart" viewBox="0 0 24 24"><path fill="currentColor" d="m12 21.35-1.45-1.32C5.4 15.36 2 12.28 2 8.5A5.5 5.5 0 0 1 7.5 3c1.74 0 3.41.81 4.5 2.09A6 6 0 0 1 16.5 3 5.5 5.5 0 0 1 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></symbol>
     </svg>
 
@@ -196,6 +197,12 @@
               <svg class="ic-off"><use href="#i-cam-off" /></svg>
               <svg class="ic-on"><use href="#i-cam" /></svg>
             </button>
+            <div class="quality-wrap">
+              <button id="quality-btn" class="icon-btn" aria-label="Quality" title="Quality" hidden>
+                <svg><use href="#i-gear" /></svg><span id="quality-badge" class="quality-badge"></span>
+              </button>
+              <div id="quality-pop" class="quality-pop" hidden></div>
+            </div>
             <button id="change-file" class="icon-btn" aria-label="Choose another movie" title="Choose another movie" hidden><svg><use href="#i-film" /></svg></button>
             <button id="fullscreen" class="icon-btn" aria-label="Fullscreen" title="Fullscreen (F)">
               <svg class="ic-expand"><use href="#i-expand" /></svg>
@@ -212,6 +219,7 @@
             <dt>Link</dt><dd id="stat-link">—</dd>
             <dt>Sync</dt><dd id="stat-sync">—</dd>
             <dt>Stream</dt><dd id="stat-stream">—</dd>
+            <dt>Quality</dt><dd id="stat-quality">—</dd>
           </dl>
           <p class="stats-foot">Video travels directly between your two devices, end-to-end encrypted.</p>
         </aside>

@@ -159,7 +159,8 @@ anyone mid-movie just rejoins with the same code.
 
 - **Keep one app process.** Rooms live in memory, so don't run the app on several servers or with multiple workers.
 - **Bandwidth:** a relayed movie uses about 1.5–4 GB through TURN; direct connections use none of your server's bandwidth.
-  `max-bps` in `turnserver.conf` caps each relay session at about 24 Mbit/s.
+  `max-bps` in `turnserver.conf` caps each relay session at about 100 Mbit/s (enough for original 4K).
+  Auto quality lowers the stream when the measured link is slower, so relayed sessions usually use far less.
 - **TURN passwords are temporary:** the app creates a new one every time a room opens, valid 6 hours, signed with the
   shared secret. If the secret ever leaks, generate a new one and update both `/etc/turnserver.conf` and `/etc/duet.env`,
   then run `systemctl restart coturn duet`.

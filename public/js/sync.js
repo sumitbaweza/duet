@@ -11,7 +11,10 @@
 const HEARTBEAT_MS = 1000;
 const PING_MS = 2000;
 const CHECK_MS = 250;
-const RESUME_AHEAD = 3; // seconds of buffer needed before resuming after a stall
+const RESUME_AHEAD = 3; // seconds of buffer needed before resuming after a stall (grows if stalls repeat)
+const MAX_RESUME_AHEAD = 30;
+const RESTALL_WINDOW_MS = 20_000; // stalling again this soon after resuming doubles the cushion
+const RELAX_AFTER_MS = 60_000; // smooth playback this long halves it again
 const STALL_AHEAD = 0.25;
 const HARD_SEEK_DRIFT = 1.0;
 const SOFT_DRIFT = 0.08;
@@ -21,9 +24,10 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 export class SyncEngine extends EventTarget {
   /**
    * @param {{video: HTMLVideoElement, role: 'host'|'guest', send: (msg: object) => void,
-   *          bufferedAhead: () => number, hasMedia: () => boolean, duration: () => number}} opts
+   *          bufferedAhead: () => number, hasMedia: () => boolean, duration: () => number,
+   *          bufferLimit?: () => number}} opts
    */
-  constructor({ video, role, send, bufferedAhead, hasMedia, duration }) {
+  constructor({ video, role, send, bufferedAhead, hasMedia, duration, bufferLimit }) {
     super();
     this.video = video;
     this.role = role;
@@ -31,6 +35,9 @@ export class SyncEngine extends EventTarget {
     this.bufferedAhead = bufferedAhead;
     this.hasMedia = hasMedia;
     this.duration = duration;
+    this.bufferLimit = bufferLimit || (() => 90); // most seconds the player will ever buffer ahead
+    this.resumeAhead = RESUME_AHEAD;
+    this.lastResumeAt = 0;
 
     this.intent = false; // what the two people want: playing or paused
     this.localBuffering = false;
@@ -251,17 +258,32 @@ export class SyncEngine extends EventTarget {
   checkBuffer() {
     if (this.remoteMode || (!this.intent && !this.localBuffering)) return;
     const v = this.video;
+    const now = performance.now();
     const ahead = this.hasMedia() ? this.bufferedAhead() : 0;
     const nearEnd = this.duration() && v.currentTime + ahead >= this.duration() - 0.5;
     if (!this.localBuffering && this.intent && ahead < STALL_AHEAD && !nearEnd) {
+      // Ran dry again soon after resuming: the link is slower than the movie right now, so wait
+      // for a bigger cushion before resuming instead of flickering between play and "Buffering…".
+      if (this.lastResumeAt && now - this.lastResumeAt < RESTALL_WINDOW_MS) {
+        this.resumeAhead = Math.min(MAX_RESUME_AHEAD, this.resumeAhead * 2);
+      }
       this.localBuffering = true;
       this.send({ t: 'buffering', on: true, time: v.currentTime });
       this.update();
-    } else if (this.localBuffering && (ahead >= RESUME_AHEAD || nearEnd || !this.intent)) {
+    } else if (this.localBuffering && (ahead >= this.resumeTarget() || nearEnd || !this.intent)) {
       this.localBuffering = false;
+      this.lastResumeAt = now;
       this.send({ t: 'buffering', on: false, time: v.currentTime });
       this.update();
+    } else if (!this.localBuffering && this.resumeAhead > RESUME_AHEAD && now - this.lastResumeAt > RELAX_AFTER_MS) {
+      this.resumeAhead = Math.max(RESUME_AHEAD, this.resumeAhead / 2);
+      this.lastResumeAt = now;
     }
+  }
+
+  /** Seconds of buffer to wait for before resuming (never more than the player can hold). */
+  resumeTarget() {
+    return Math.max(1, Math.min(this.resumeAhead, this.bufferLimit() - 2));
   }
 
   // ---- native control events (e.g. iPhone fullscreen player) ----
@@ -295,6 +317,7 @@ export class SyncEngine extends EventTarget {
           intent: this.intent,
           localBuffering: this.localBuffering,
           peerBuffering: this.peerBuffering,
+          resumeAhead: this.resumeTarget(),
           rttMs: Math.round(this.rtt * 1000),
           drift,
         },

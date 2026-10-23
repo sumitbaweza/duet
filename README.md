@@ -70,6 +70,18 @@ Add `?debug` to the URL for signaling logs and `window.duet` state.
 
 ## Known limits and recommended next steps
 
+- **Auto quality (4K over normal internet).** The host measures the link (DataChannel drain rate plus a
+  ~1 s speed probe) and picks the best quality that fits in 75% of it: **Original**, or a live H.264
+  re-encode at **1080p (6 Mbps) / 720p (3) / 480p (1.4) / 360p (0.7)**, made on the host by hardware
+  decode → GPU resize → hardware encode (`remux-source.js`). It steps down fast when the link or the
+  partner's buffer drops, and up only when it's clearly sustained. 4K sources start at 720p and allow 1080p
+  once the device proves it re-encodes at ≥1.4× real time; too slow even at 360p → compatibility mode. Both
+  people get a ⚙ menu (Auto / Original / 1080p / …) and the stats panel shows link speed vs movie bitrate.
+  A partner whose browser can't decode the original (e.g. HEVC on Firefox) gets the H.264 re-encode
+  instead of live mode.
+- **Buffering.** The partner's buffer is sized in megabytes from the stream bitrate (≈120 MB desktop,
+  60 MB phones) so 4K never overflows the browser's MSE limit; after a repeat stall it waits for a bigger
+  cushion (3 → 6 → 12 … 30 s) instead of flickering, and the "Buffering…" card only shows after 0.9 s.
 - **Formats.** Duet picks a delivery path automatically:
 
   | File | Path | Quality |

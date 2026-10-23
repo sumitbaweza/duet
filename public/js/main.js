@@ -32,6 +32,9 @@ const state = {
   compatSender: null, // host only: live-video fallback ("compatibility mode")
   compat: null, // guest only: {streamId, stream} while watching the host's live picture
   compatPending: false, // guest only: told the host we can't decode; waiting for the live stream
+  abr: null, // auto-quality state from the host's streamer: {quality, current, linkBps, movieBps, …}
+  bufferingSince: null, // when the current buffering started (to avoid flashing the card)
+  bufferingTimer: null,
   duration: 0,
   pendingSignals: [],
   lastBytes: 0,
@@ -313,6 +316,8 @@ function startPeer() {
         ? !!state.file && (!state.localPlayer || !!state.localPlayer.meta)
         : !!state.player?.meta || !!state.compat?.stream,
     duration: () => state.duration,
+    bufferLimit: () =>
+      (state.role === 'host' ? state.localPlayer?.player.aheadLimit : state.player?.aheadLimit) ?? 90,
   }));
   if (state.role === 'host' && state.file && state.resumeOnRejoin) {
     // Partner is back after dropping mid-movie: resume once they've buffered this spot.
@@ -351,6 +356,8 @@ function teardownPeer({ keepPendingSignals = false } = {}) {
   camera.setPartner(false);
   if (!keepPendingSignals) state.pendingSignals = [];
   state.guestStatus = null;
+  state.abr = null;
+  renderQuality();
   setLink(null);
   ui.setPlaying(false);
   if (state.role === 'guest') {
@@ -362,7 +369,19 @@ function teardownPeer({ keepPendingSignals = false } = {}) {
 function onControl(msg) {
   switch (msg.t) {
     case 'accept':
-      state.streamer?.begin(msg.tracks, video.currentTime);
+      state.streamer
+        ?.begin(msg.tracks, video.currentTime, { canOriginal: msg.canOriginal, canAvc: msg.canAvc })
+        .catch((err) => {
+          console.warn('Streaming could not start:', err.message);
+          startCompat('guest');
+        });
+      break;
+    case 'quality': // partner picked a quality in their menu
+      state.streamer?.setQuality?.(msg.value);
+      break;
+    case 'abr': // host's auto-quality state, for our menu and stats
+      state.abr = msg.state;
+      renderQuality();
       break;
     case 'reject':
       if (msg.code === 'codec') startCompat('guest');
@@ -458,6 +477,12 @@ async function loadFile(file) {
   state.compatSender = null;
   state.file = file;
   state.nativeOnly = nativeOnly;
+  state.duration = 0; // the new movie's length is known once its metadata loads
+  // A new movie starts paused. Done before the loading below so a "play" pressed meanwhile sticks.
+  if (state.sync) {
+    state.sync.intent = false;
+    state.sync.update();
+  }
   state.localPlayer?.close();
   state.localPlayer = null;
   if (state.fileUrl) URL.revokeObjectURL(state.fileUrl);
@@ -476,10 +501,6 @@ async function loadFile(file) {
     state.duration = video.duration;
   }
   $('stat-file').textContent = `${file.name} · ${formatBytes(file.size)}`;
-  if (state.sync) {
-    state.sync.intent = false;
-    state.sync.update();
-  }
   if (state.peer?.isOpen) startStreaming();
   refreshOverlay();
   ui.render();
@@ -515,7 +536,19 @@ async function startStreaming() {
   if (state.nativeOnly) return startCompat('host');
   state.compatSender?.stop();
   state.compatSender = null;
-  const streamer = (state.streamer = new HostStreamer(state.file, peer));
+  state.abr = null;
+  renderQuality();
+  const streamer = (state.streamer = new HostStreamer(state.file, peer, { adaptive: true }));
+  streamer.onState = (abr) => {
+    if (streamer !== state.streamer) return;
+    state.abr = abr;
+    renderQuality();
+    peer.sendControl({ t: 'abr', state: abr });
+  };
+  // Even the lowest re-encode can't keep up on this device: fall back to live video.
+  streamer.onTooSlow = () => {
+    if (streamer === state.streamer) startCompat('slow');
+  };
   try {
     const meta = await streamer.probe();
     if (peer.video.readyState !== 'open') await once(peer.video, 'open');
@@ -544,10 +577,14 @@ function startCompat(reason) {
   state.compatSender = new CompatSender(peer, video);
   state.compatSender.start({ duration: state.duration, name: state.file.name, size: state.file.size });
   $('stat-stream').textContent = 'Live (compatibility mode)';
+  state.abr = null;
+  renderQuality();
   toast(
     reason === 'guest'
       ? `${state.peerName || 'Your partner'}'s browser can't decode this video, so it's streamed live (compatibility mode).`
-      : 'This format is streamed live to your partner (compatibility mode).',
+      : reason === 'slow'
+        ? "This device can't convert the video fast enough, so it's streamed live instead (compatibility mode)."
+        : 'This format is streamed live to your partner (compatibility mode).',
     7000
   );
 }
@@ -623,13 +660,27 @@ function refreshOverlay(errorText) {
     return show('Waiting for your partner to pick a movie…', '', { spin: true });
   }
   if (s?.blocked) return show('Ready when you are', 'Your browser needs a tap before it can play.', { tap: true });
-  if (s?.intent && s.localBuffering) return show('Buffering…', 'Loading from your partner’s device.', { spin: true });
-  if (s?.intent && s.peerBuffering) {
-    return show(`Waiting for ${state.peerName || 'your partner'}…`, 'Their video is buffering.', { spin: true });
+  // Buffering: only show the card if it lasts a moment, so brief hiccups don't flash it.
+  const buffering = s?.intent && (s.localBuffering || s.peerBuffering);
+  if (buffering) {
+    state.bufferingSince ??= performance.now();
+    const waited = performance.now() - state.bufferingSince;
+    if (waited < BUFFER_CARD_DELAY_MS) {
+      clearTimeout(state.bufferingTimer);
+      state.bufferingTimer = setTimeout(() => refreshOverlay(), BUFFER_CARD_DELAY_MS - waited + 20);
+    } else if (s.localBuffering) {
+      const wait = Math.round(s.resumeAhead || 3);
+      return show('Buffering…', `Loading from your partner’s device · resumes with ${wait} s ready.`, { spin: true });
+    } else {
+      return show(`Waiting for ${state.peerName || 'your partner'}…`, 'Their video is buffering.', { spin: true });
+    }
+  } else {
+    state.bufferingSince = null;
   }
   overlay.classList.add('hidden');
   ui.setBusy(false);
 }
+const BUFFER_CARD_DELAY_MS = 900;
 
 function onSyncState(st) {
   ui.setPlaying(st.intent);
@@ -684,11 +735,58 @@ setInterval(() => {
     $('stat-stream').textContent = 'Live video (compatibility mode)';
   } else if (state.peer?.isOpen && (state.streamer || state.player?.meta)) {
     const who = state.role === 'host' ? 'partner has' : 'buffered';
-    $('stat-stream').textContent = `${formatBytes(rate)}/s · ${who} ${ahead != null ? Math.round(ahead) + ' s' : '—'}`;
+    $('stat-stream').textContent = `${formatMbps(rate * 8)} · ${who} ${ahead != null ? Math.round(ahead) + ' s' : '—'}`;
   } else {
     $('stat-stream').textContent = '—';
   }
+  renderQuality();
 }, 2000);
+
+const formatMbps = (bps) => (bps == null ? '—' : bps >= 1e6 ? `${(bps / 1e6).toFixed(bps >= 1e7 ? 0 : 1)} Mbps` : `${Math.round(bps / 1e3)} kbps`);
+
+// ---------------------------------------------------------------- quality menu (auto quality)
+
+const QUALITY_LABELS = { auto: 'Auto', original: 'Original', 1080: '1080p', 720: '720p', 480: '480p', 360: '360p' };
+
+/** Stats line + quality menu from the host's auto-quality state (host: local, guest: via 'abr'). */
+function renderQuality() {
+  const abr = state.abr;
+  const options = abr?.available?.length ? ['auto', ...abr.available] : [];
+  $('quality-btn').hidden = options.length < 2;
+  $('quality-badge').textContent = abr ? (abr.current === 'Original' ? 'HD' : abr.current) : '';
+  $('stat-quality').textContent = abr
+    ? `${abr.quality === 'auto' ? 'Auto · ' : ''}${abr.current}` +
+      (abr.streamBps ? ` (${formatMbps(abr.streamBps)})` : '') +
+      ` · link ≈ ${formatMbps(abr.linkBps)} · movie ${formatMbps(abr.movieBps)}`
+    : '—';
+  const menu = $('quality-pop');
+  if (menu.hidden) return;
+  menu.innerHTML = options
+    .map((q) => {
+      const active = abr.quality === q;
+      const label = q === 'auto' ? `Auto <span class="muted">(${abr.current})</span>` : QUALITY_LABELS[q];
+      return `<button class="q-opt${active ? ' active' : ''}" data-q="${q}">${label}</button>`;
+    })
+    .join('');
+}
+
+function setQualityOpen(open) {
+  $('quality-pop').hidden = !open;
+  ui.hold('quality', open);
+  renderQuality();
+}
+$('quality-btn').onclick = (e) => {
+  e.stopPropagation();
+  setQualityOpen($('quality-pop').hidden);
+};
+$('quality-pop').addEventListener('click', (e) => {
+  const q = e.target.closest('[data-q]')?.dataset.q;
+  if (!q) return;
+  if (state.role === 'host') state.streamer?.setQuality(q);
+  else state.peer?.sendControl({ t: 'quality', value: q });
+  setQualityOpen(false);
+  toast(q === 'auto' ? 'Quality: Auto (adjusts to your connection)' : `Quality: ${QUALITY_LABELS[q]}`);
+});
 
 // ---------------------------------------------------------------- controls
 
@@ -758,6 +856,7 @@ $('stats-close').onclick = () => setStatsOpen(false);
 document.addEventListener('pointerdown', (e) => {
   if (!$('react-pop').hidden && !e.target.closest('.react-wrap')) setReactOpen(false);
   if (!$('stats').hidden && !e.target.closest('#stats, #stats-btn')) setStatsOpen(false);
+  if (!$('quality-pop').hidden && !e.target.closest('.quality-wrap')) setQualityOpen(false);
 });
 
 function floatReaction(emoji) {
