@@ -193,6 +193,8 @@ svg { width: 22px; height: 22px; flex: none; }
   background: rgb(0 0 0 / 0.3); border: 1px solid var(--line); transition: border-color 0.2s, box-shadow 0.2s;
 }
 .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgb(255 79 139 / 0.15); }
+.field input.invalid { border-color: var(--danger); box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 18%, transparent); }
+.field input.shake { animation: shake 0.35s; }
 .panel { display: grid; gap: 14px; }
 .hint { margin: -4px 0 4px; color: var(--muted); font-size: 14px; }
 .code-boxes { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -248,6 +250,21 @@ svg { width: 22px; height: 22px; flex: none; }
   display: flex; align-items: center; gap: 8px;
   padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 40px max(14px, env(safe-area-inset-left));
   background: linear-gradient(rgb(0 0 0 / 0.65), transparent);
+}
+.topbar { flex-wrap: wrap; row-gap: 10px; }
+/* Second row of the top bar: the movie's name, for both people */
+.now-playing {
+  flex-basis: 100%; min-width: 0; display: flex; align-items: center; gap: 8px;
+  font-size: 15px; text-shadow: 0 1px 6px rgb(0 0 0 / 0.6);
+}
+.now-playing[hidden] { display: none; }
+.now-playing svg { width: 18px; height: 18px; flex: none; color: var(--accent); }
+.np-label {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+}
+.np-title {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: 'Space Grotesk', 'Inter', sans-serif; font-weight: 600;
 }
 .code-pill strong { letter-spacing: 0.16em; font-weight: 700; }
 .code-pill:hover { border-color: var(--line-strong); }
@@ -460,6 +477,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; bo
 @media (max-width: 640px) {
   .pill { height: 32px; padding: 0 11px; font-size: 12px; }
   .code-pill .muted { display: none; }
+  .np-label { display: none; }
+  .now-playing { font-size: 14px; }
   .link-pill #link-text { display: none; }
   .link-pill { padding: 0 10px; }
   .icon-btn { width: 40px; height: 40px; }

@@ -79,7 +79,8 @@ function newCode() {
 }
 
 const newToken = () => randomBytes(16).toString('hex');
-const cleanName = (n) => String(n ?? '').trim().slice(0, 24) || 'Friend';
+const cleanName = (n) => String(n ?? '').trim().replace(/\s+/g, ' ').slice(0, 24);
+const NAME_REQUIRED = { ok: false, error: 'Please enter your name.', field: 'name' };
 
 function otherMember(room, role) {
   return role === 'host' ? room.members.guest : room.members.host;
@@ -122,12 +123,14 @@ io.on('connection', (socket) => {
 
   socket.on('create-room', (payload, ack) => {
     if (typeof ack !== 'function') return;
+    const name = cleanName(payload?.name);
+    if (!name) return ack(NAME_REQUIRED);
     leaveCurrentRoom(socket);
     const room = {
       code: newCode(),
       createdAt: Date.now(),
       emptySince: null,
-      members: { host: { token: newToken(), socketId: null, name: cleanName(payload?.name) }, guest: null },
+      members: { host: { token: newToken(), socketId: null, name }, guest: null },
     };
     rooms.set(room.code, room);
     ack(attach(socket, room, 'host'));
@@ -155,8 +158,10 @@ io.on('connection', (socket) => {
       }
     }
     if (room.members.guest) return ack({ ok: false, error: 'This room already has two people.' });
+    const name = cleanName(payload?.name);
+    if (!name) return ack(NAME_REQUIRED);
     leaveCurrentRoom(socket);
-    room.members.guest = { token: newToken(), socketId: null, name: cleanName(payload?.name) };
+    room.members.guest = { token: newToken(), socketId: null, name };
     ack(attach(socket, room, 'guest'));
   });
 

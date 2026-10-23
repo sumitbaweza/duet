@@ -7,6 +7,7 @@ import { Camera } from './camera.js';
 import { PlayerUI } from './player-ui.js';
 import { LocalPlayer } from './local-player.js';
 import { CompatSender, canCapture } from './compat.js';
+import { readableFile, clearMovieCopies } from './file-access.js';
 
 const $ = (id) => document.getElementById(id);
 const video = $('video');
@@ -127,11 +128,15 @@ if (params.get('room')) {
 }
 
 $('create').onclick = () => {
+  const name = requireName();
+  if (!name) return;
   unlockMedia();
-  socket.emit('create-room', { name: myName() }, onJoined);
+  socket.emit('create-room', { name }, onJoined);
 };
 $('join-form').onsubmit = (e) => {
   e.preventDefault();
+  const name = requireName();
+  if (!name) return;
   unlockMedia();
   const code = getCode();
   if (code.length !== 6) {
@@ -142,14 +147,32 @@ $('join-form').onsubmit = (e) => {
   }
   const saved = loadSession();
   const token = saved?.code === code ? saved.token : undefined;
-  socket.emit('join-room', { code, name: myName(), token }, onJoined);
+  socket.emit('join-room', { code, name, token }, onJoined);
 };
 
 function myName() {
-  const name = $('name').value.trim() || 'Friend';
-  safeSet(localStorage, 'duet:name', name);
+  const name = $('name').value.trim().replace(/\s+/g, ' ');
+  if (name) safeSet(localStorage, 'duet:name', name);
   return name;
 }
+
+/** The name is required: point at the empty field instead of starting a session. */
+function requireName() {
+  const name = myName();
+  if (name) return name;
+  const field = $('name');
+  field.classList.remove('invalid', 'shake');
+  void field.offsetWidth; // restart the shake animation
+  field.classList.add('invalid', 'shake');
+  field.focus();
+  showHomeError('Please enter your name so your partner knows who joined.');
+  return null;
+}
+$('name').addEventListener('input', () => {
+  if (!$('name').value.trim()) return;
+  $('name').classList.remove('invalid');
+  if ($('home-error').textContent.startsWith('Please enter your name')) showHomeError('');
+});
 
 function showHomeError(msg) {
   $('home-error').textContent = msg;
@@ -168,7 +191,10 @@ socket.on('connect', () => {
 
 async function onJoined(res) {
   dlog('joined', res?.ok, res?.role, 'peerOnline', res?.peerOnline);
-  if (!res?.ok) return showHomeError(res?.error || 'Something went wrong.');
+  if (!res?.ok) {
+    if (res?.field === 'name') return requireName();
+    return showHomeError(res?.error || 'Something went wrong.');
+  }
   const reconnect = state.code === res.state.code;
   // The partner rebuilds its connection when we (re)join, so ours is stale; drop it now so their
   // offer gets queued instead of landing on the old RTCPeerConnection while we await below.
@@ -277,6 +303,7 @@ function startPeer() {
       state.compatPending = false;
       state.duration = e.detail.duration;
       $('stat-file').textContent = `${e.detail.name} · ${formatBytes(e.detail.size)}`;
+      setNowPlaying(e.detail.name);
       refreshOverlay();
       ui.render();
     });
@@ -363,7 +390,18 @@ function teardownPeer({ keepPendingSignals = false } = {}) {
   if (state.role === 'guest') {
     state.duration = 0;
     $('stat-file').textContent = '—';
+    setNowPlaying(null);
   }
+}
+
+/** Show the movie's name at the top of the player ("Gajab.Raat.2026.720p.mkv" → "Gajab Raat 2026 720p"). */
+function setNowPlaying(fileName) {
+  let title = (fileName || '').replace(/\.[a-z0-9]{2,4}$/i, '');
+  if (!/\s/.test(title)) title = title.replace(/[._]+/g, ' ');
+  title = title.trim();
+  $('np-title').textContent = title;
+  $('np-title').title = fileName || '';
+  $('now-playing').hidden = !title;
 }
 
 function onControl(msg) {
@@ -419,6 +457,7 @@ function onControl(msg) {
 // ---------------------------------------------------------------- host: choosing & streaming a file
 
 $('pick-file').onclick = $('change-file').onclick = () => $('file').click();
+clearMovieCopies(); // copies left over from an earlier visit
 
 $('file').onchange = () => {
   const file = $('file').files[0];
@@ -457,6 +496,25 @@ stage.addEventListener('drop', (e) => {
 const VIDEO_EXTENSIONS = /\.(mp4|m4v|mov|mkv|webm|ts|m2ts|mts|ogv|avi|wmv|flv)$/i;
 
 async function loadFile(file) {
+  const loading = (state.loading = {}); // a newer pick supersedes this one
+  // Some phones can only read the picked video front to back, or not at all: check, copy if needed.
+  try {
+    file = await readableFile(file, (fraction) => {
+      const pct = Math.floor(fraction * 100);
+      if (state.loading !== loading || pct === state.preparing) return;
+      state.preparing = pct;
+      refreshOverlay();
+    });
+  } catch (err) {
+    if (state.loading === loading) toast(err.message, 15000);
+    return;
+  } finally {
+    if (state.loading === loading && state.preparing != null) {
+      state.preparing = null;
+      refreshOverlay();
+    }
+  }
+  if (state.loading !== loading) return;
   // Validate before telling the partner anything.
   const probe = new HostStreamer(file);
   let meta;
@@ -501,6 +559,7 @@ async function loadFile(file) {
     state.duration = video.duration;
   }
   $('stat-file').textContent = `${file.name} · ${formatBytes(file.size)}`;
+  setNowPlaying(file.name);
   if (state.peer?.isOpen) startStreaming();
   refreshOverlay();
   ui.render();
@@ -596,6 +655,7 @@ function enterCompat(msg) {
   state.peer.compatStreamId = msg.streamId;
   state.duration = msg.duration;
   $('stat-file').textContent = `${msg.name} · ${formatBytes(msg.size)} · live (compatibility mode)`;
+  setNowPlaying(msg.name);
   video.removeAttribute('src');
   state.sync?.setRemoteControl(true);
   state.peer.sendControl({ t: 'compat-ready' });
@@ -633,6 +693,13 @@ function refreshOverlay(errorText) {
   ui.setHasMedia(isHost ? !!state.file : !!state.player?.meta || !!state.compat?.stream);
 
   if (errorText) return show(errorText);
+  if (isHost && state.preparing != null) {
+    return show(
+      `Getting the movie ready… ${state.preparing}%`,
+      'This phone can only read the video from start to end, so it’s copied into the browser once first.',
+      { spin: true }
+    );
+  }
   if (isHost && !state.file) {
     const sub = connected
       ? 'Drop a video here or browse. It streams straight to your partner.'

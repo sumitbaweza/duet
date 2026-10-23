@@ -75,7 +75,7 @@
 
           <label class="field">
             <span>Your name</span>
-            <input id="name" maxlength="24" autocomplete="nickname" />
+            <input id="name" maxlength="24" autocomplete="nickname" required aria-required="true" />
           </label>
 
           <div id="panel-create" class="panel">
@@ -150,6 +150,11 @@
             <span id="partner-name">Waiting…</span>
           </span>
           <button id="stats-btn" class="icon-btn" aria-label="Connection stats" title="Stats"><svg><use href="#i-info" /></svg></button>
+          <div id="now-playing" class="now-playing" hidden>
+            <svg aria-hidden="true"><use href="#i-film" /></svg>
+            <span class="np-label">Now playing</span>
+            <span id="np-title" class="np-title"></span>
+          </div>
         </header>
 
         <!-- Bottom controls -->
