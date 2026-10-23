@@ -34,6 +34,7 @@ export class Voice extends EventTarget {
     this.senders = [];
     peer.addEventListener('track', (e) => {
       if (e.detail.track.kind !== 'audio') return;
+      if (e.detail.stream && e.detail.stream.id === peer.compatStreamId) return; // movie sound, not voice
       this.remoteAudio.srcObject = e.detail.stream || new MediaStream([e.detail.track]);
       this.remoteAudio.play().catch(() => {});
       this.watchRemote(this.remoteAudio.srcObject);

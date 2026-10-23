@@ -4,6 +4,9 @@
 // - The host is the clock: it sends a heartbeat every second and the guest corrects drift with
 //   tiny playbackRate nudges (0.95x–1.05x), or a hard seek when it's more than a second off.
 // - If either side runs out of buffered video, both pause until it has a few seconds again.
+// - Remote-control mode (guest in compatibility mode): the guest's <video> shows the host's live
+//   picture, so the guest never seeks or pauses it; its buttons only send commands, and the clock
+//   shown is estimated from the host's heartbeats.
 
 const HEARTBEAT_MS = 1000;
 const PING_MS = 2000;
@@ -38,6 +41,8 @@ export class SyncEngine extends EventTarget {
     this.expectPlay = 0; // count of play/pause/seek calls we made ourselves (vs. native controls)
     this.expectPause = 0;
     this.expectSeek = 0;
+    this.remoteMode = false;
+    this.remote = { time: 0, playing: false, at: performance.now() }; // last host heartbeat
 
     this.listeners = {
       play: () => this.onNativePlay(),
@@ -54,20 +59,43 @@ export class SyncEngine extends EventTarget {
     if (role === 'host') this.timers.push(setInterval(() => this.heartbeat(), HEARTBEAT_MS));
   }
 
+  /** Guest in compatibility mode: show the host's live picture and act as a remote control. */
+  setRemoteControl(on) {
+    this.remoteMode = on;
+    this.video.playbackRate = 1;
+    // A live picture never buffers: tell the host we're ready (it may be waiting for us after a
+    // rejoin, or we may have said "buffering" before switching).
+    if (on) this.send({ t: 'buffering', on: false });
+    this.localBuffering = false;
+    this.update();
+  }
+
+  /** Movie time: the <video>'s own clock, or (remote control) estimated from the host's heartbeat. */
+  currentTime() {
+    if (!this.remoteMode) return this.video.currentTime;
+    const r = this.remote;
+    const elapsed = r.playing ? (performance.now() - r.at) / 1000 : 0;
+    return Math.min(this.duration() || Infinity, r.time + elapsed);
+  }
+
   // ---- user actions (custom controls) ----
 
   play() {
     this.lastLocalAction = performance.now();
     this.intent = true;
-    if (this.video.ended) this.setTime(0); // play again from the start
-    this.send({ t: 'play', time: this.video.currentTime });
+    if (this.video.ended && !this.remoteMode) this.setTime(0); // play again from the start
+    const time = this.currentTime();
+    if (this.remoteMode) this.remote = { time, playing: true, at: performance.now() };
+    this.send({ t: 'play', time });
     this.update();
   }
 
   pause() {
     this.lastLocalAction = performance.now();
     this.intent = false;
-    this.send({ t: 'pause', time: this.video.currentTime });
+    const time = this.currentTime();
+    if (this.remoteMode) this.remote = { time, playing: false, at: performance.now() };
+    this.send({ t: 'pause', time });
     this.update();
   }
 
@@ -78,7 +106,8 @@ export class SyncEngine extends EventTarget {
   seek(time) {
     this.lastLocalAction = performance.now();
     time = clamp(time, 0, this.duration() || Infinity);
-    this.setTime(time);
+    if (this.remoteMode) this.remote = { time, playing: this.remote.playing, at: performance.now() };
+    else this.setTime(time);
     this.send({ t: 'seek', time });
     this.update();
   }
@@ -86,6 +115,11 @@ export class SyncEngine extends EventTarget {
   // ---- remote messages ----
 
   handle(msg) {
+    if (this.remoteMode && (msg.t === 'play' || msg.t === 'pause' || msg.t === 'seek')) {
+      if (msg.t !== 'seek') this.intent = msg.t === 'play';
+      this.remote = { time: msg.time, playing: this.intent, at: performance.now() };
+      return this.update();
+    }
     switch (msg.t) {
       case 'play':
         this.intent = true;
@@ -136,6 +170,11 @@ export class SyncEngine extends EventTarget {
   onHeartbeat(msg) {
     // A heartbeat sent before the host saw our latest click would undo it; ignore those briefly.
     if (performance.now() - this.lastLocalAction < 1500) return;
+    if (this.remoteMode) {
+      this.remote = { time: msg.time + (msg.playing ? this.rtt / 2 : 0), playing: msg.playing, at: performance.now() };
+      this.intent = msg.intent;
+      return this.update();
+    }
     const v = this.video;
     const intentChanged = this.intent !== msg.intent;
     this.intent = msg.intent;
@@ -184,6 +223,11 @@ export class SyncEngine extends EventTarget {
 
   update() {
     const v = this.video;
+    if (this.remoteMode) {
+      // A live picture: keep it running; the host's pause freezes the frames.
+      if (v.paused && v.srcObject) v.play().catch(() => this.dispatchEvent(new Event('autoplay-blocked')));
+      return this.emitState();
+    }
     if (this.shouldPlay && v.paused && !v.ended) {
       this.expectPlay++;
       v.play().catch((err) => {
@@ -205,7 +249,7 @@ export class SyncEngine extends EventTarget {
   }
 
   checkBuffer() {
-    if (!this.intent && !this.localBuffering) return;
+    if (this.remoteMode || (!this.intent && !this.localBuffering)) return;
     const v = this.video;
     const ahead = this.hasMedia() ? this.bufferedAhead() : 0;
     const nearEnd = this.duration() && v.currentTime + ahead >= this.duration() - 0.5;
@@ -223,11 +267,13 @@ export class SyncEngine extends EventTarget {
   // ---- native control events (e.g. iPhone fullscreen player) ----
 
   onNativePlay() {
+    if (this.remoteMode) return;
     if (this.expectPlay > 0) return void this.expectPlay--;
     if (!this.intent) this.play();
   }
 
   onNativePause() {
+    if (this.remoteMode) return;
     if (this.expectPause > 0) return void this.expectPause--;
     if (this.video.ended) {
       this.intent = false;
@@ -237,6 +283,7 @@ export class SyncEngine extends EventTarget {
   }
 
   onNativeSeeking() {
+    if (this.remoteMode) return;
     if (this.expectSeek > 0) return void this.expectSeek--;
     this.send({ t: 'seek', time: this.video.currentTime });
   }

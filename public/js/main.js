@@ -6,6 +6,7 @@ import { Voice } from './voice.js';
 import { Camera } from './camera.js';
 import { PlayerUI } from './player-ui.js';
 import { LocalPlayer } from './local-player.js';
+import { CompatSender, canCapture } from './compat.js';
 
 const $ = (id) => document.getElementById(id);
 const video = $('video');
@@ -27,6 +28,10 @@ const state = {
   file: null, // host only
   fileUrl: null,
   localPlayer: null, // host only: plays MKV/WebM/AC-3… files through the conversion pipeline
+  nativeOnly: false, // host only: file can't be streamed as data, only played here and sent live
+  compatSender: null, // host only: live-video fallback ("compatibility mode")
+  compat: null, // guest only: {streamId, stream} while watching the host's live picture
+  compatPending: false, // guest only: told the host we can't decode; waiting for the live stream
   duration: 0,
   pendingSignals: [],
   lastBytes: 0,
@@ -44,6 +49,7 @@ const ui = new PlayerUI({
   stage,
   video,
   getDuration: () => state.duration || (Number.isFinite(video.duration) ? video.duration : 0),
+  getTime: () => (state.sync ? state.sync.currentTime() : video.currentTime),
   onToggle: () => {
     unlockMedia();
     state.sync?.toggle();
@@ -265,6 +271,7 @@ function startPeer() {
   if (state.role === 'guest') {
     const player = (state.player = new GuestPlayer(video, peer));
     player.addEventListener('meta', (e) => {
+      state.compatPending = false;
       state.duration = e.detail.duration;
       $('stat-file').textContent = `${e.detail.name} · ${formatBytes(e.detail.size)}`;
       refreshOverlay();
@@ -275,6 +282,20 @@ function startPeer() {
       toast(e.detail, 10000);
       refreshOverlay(e.detail);
     });
+    player.addEventListener('unsupported', () => {
+      state.compatPending = true; // the host answers with compatibility mode
+      refreshOverlay();
+    });
+    // Compatibility mode: the movie arrives as a live track; show it in the main player.
+    peer.addEventListener('track', (e) => {
+      const stream = e.detail.stream;
+      if (!state.compat || !stream || stream.id !== state.compat.streamId) return;
+      state.compat.stream = stream;
+      video.srcObject = stream;
+      video.play().catch(() => {});
+      state.sync?.update();
+      refreshOverlay();
+    });
   }
 
   const sync = (state.sync = new SyncEngine({
@@ -284,9 +305,13 @@ function startPeer() {
     bufferedAhead: () =>
       state.role === 'host'
         ? state.localPlayer?.bufferedAhead() ?? Infinity
-        : state.player.bufferedAhead(),
+        : state.compat
+          ? Infinity
+          : state.player.bufferedAhead(),
     hasMedia: () =>
-      state.role === 'host' ? !!state.file && (!state.localPlayer || !!state.localPlayer.meta) : !!state.player?.meta,
+      state.role === 'host'
+        ? !!state.file && (!state.localPlayer || !!state.localPlayer.meta)
+        : !!state.player?.meta || !!state.compat?.stream,
     duration: () => state.duration,
   }));
   if (state.role === 'host' && state.file && state.resumeOnRejoin) {
@@ -317,6 +342,12 @@ function teardownPeer({ keepPendingSignals = false } = {}) {
   state.player = null;
   state.peer?.close();
   state.peer = null;
+  state.compatSender = null;
+  if (state.compat) {
+    video.srcObject = null;
+    state.compat = null;
+  }
+  state.compatPending = false;
   camera.setPartner(false);
   if (!keepPendingSignals) state.pendingSignals = [];
   state.guestStatus = null;
@@ -334,7 +365,19 @@ function onControl(msg) {
       state.streamer?.begin(msg.tracks, video.currentTime);
       break;
     case 'reject':
-      toast(msg.reason, 10000);
+      if (msg.code === 'codec') startCompat('guest');
+      else toast(msg.reason, 10000);
+      break;
+    case 'compat':
+      if (msg.on) enterCompat(msg);
+      else exitCompat();
+      break;
+    case 'compat-ready':
+      state.compatSender?.onReady();
+      break;
+    case 'compat-unavailable':
+      state.compatPending = false;
+      refreshOverlay(msg.reason);
       break;
     case 'need':
       state.streamer?.seek(msg.time);
@@ -398,20 +441,28 @@ async function loadFile(file) {
   // Validate before telling the partner anything.
   const probe = new HostStreamer(file);
   let meta;
+  let nativeOnly = false;
   try {
     meta = await probe.probe();
   } catch (err) {
-    toast(err.message, 10000);
-    return;
+    // Can't be streamed as data. If this browser can still play it, send it live instead.
+    nativeOnly = canCapture(video) && (await playsHere(file));
+    if (!nativeOnly) {
+      toast(err.message, 10000);
+      return;
+    }
   } finally {
     probe.close();
   }
+  state.compatSender?.stop();
+  state.compatSender = null;
   state.file = file;
+  state.nativeOnly = nativeOnly;
   state.localPlayer?.close();
   state.localPlayer = null;
   if (state.fileUrl) URL.revokeObjectURL(state.fileUrl);
   state.fileUrl = null;
-  if (probe.mode === 'remux') {
+  if (!nativeOnly && probe.mode === 'remux') {
     // The browser can't play this file directly: play it through the conversion pipeline.
     const local = (state.localPlayer = new LocalPlayer(file, video));
     local.addEventListener('error', (e) => toast(e.detail, 10000));
@@ -440,9 +491,30 @@ video.addEventListener('error', () => {
   }
 });
 
+/** Can this browser play the file by itself? (Tried in a throwaway <video>.) */
+async function playsHere(file) {
+  const test = document.createElement('video');
+  test.muted = true;
+  const url = URL.createObjectURL(file);
+  test.src = url;
+  const ok = await Promise.race([
+    once(test, 'loadedmetadata').then(() => test.videoWidth > 0),
+    once(test, 'error').then(() => false),
+    new Promise((r) => setTimeout(() => r(false), 6000)),
+  ]);
+  test.removeAttribute('src');
+  test.load();
+  URL.revokeObjectURL(url);
+  return ok;
+}
+
 async function startStreaming() {
   const peer = state.peer;
   state.streamer?.close();
+  state.streamer = null;
+  if (state.nativeOnly) return startCompat('host');
+  state.compatSender?.stop();
+  state.compatSender = null;
   const streamer = (state.streamer = new HostStreamer(state.file, peer));
   try {
     const meta = await streamer.probe();
@@ -452,6 +524,54 @@ async function startStreaming() {
   } catch (err) {
     toast(err.message, 10000);
   }
+}
+
+// ---------------------------------------------------------------- compatibility mode (live video)
+
+/** Host: send the movie as live video, because the partner can't decode it or it isn't streamable. */
+function startCompat(reason) {
+  const peer = state.peer;
+  if (!peer?.isOpen || !state.file) return;
+  if (!canCapture(video)) {
+    const msg = "Your partner's browser can't play this video, and this browser can't stream it live. Use Chrome or Edge, or convert the movie to H.264 MP4.";
+    peer.sendControl({ t: 'compat-unavailable', reason: msg });
+    toast(msg, 10000);
+    return;
+  }
+  state.streamer?.close();
+  state.streamer = null;
+  state.compatSender?.stop();
+  state.compatSender = new CompatSender(peer, video);
+  state.compatSender.start({ duration: state.duration, name: state.file.name, size: state.file.size });
+  $('stat-stream').textContent = 'Live (compatibility mode)';
+  toast(
+    reason === 'guest'
+      ? `${state.peerName || 'Your partner'}'s browser can't decode this video, so it's streamed live (compatibility mode).`
+      : 'This format is streamed live to your partner (compatibility mode).',
+    7000
+  );
+}
+
+/** Guest: the host is about to send the movie as a live track; we become a remote control. */
+function enterCompat(msg) {
+  state.compatPending = false;
+  state.compat = { streamId: msg.streamId, stream: null };
+  state.peer.compatStreamId = msg.streamId;
+  state.duration = msg.duration;
+  $('stat-file').textContent = `${msg.name} · ${formatBytes(msg.size)} · live (compatibility mode)`;
+  video.removeAttribute('src');
+  state.sync?.setRemoteControl(true);
+  state.peer.sendControl({ t: 'compat-ready' });
+  refreshOverlay();
+}
+
+function exitCompat() {
+  if (!state.compat) return;
+  video.srcObject = null;
+  state.compat = null;
+  if (state.peer) state.peer.compatStreamId = null;
+  state.sync?.setRemoteControl(false);
+  refreshOverlay();
 }
 
 // ---------------------------------------------------------------- status card
@@ -473,7 +593,7 @@ function refreshOverlay(errorText) {
   const isHost = state.role === 'host';
   const s = state.sync;
   const connected = !!state.peer?.isOpen;
-  ui.setHasMedia(isHost ? !!state.file : !!state.player?.meta);
+  ui.setHasMedia(isHost ? !!state.file : !!state.player?.meta || !!state.compat?.stream);
 
   if (errorText) return show(errorText);
   if (isHost && !state.file) {
@@ -492,7 +612,16 @@ function refreshOverlay(errorText) {
     });
   }
   if (!connected) return show('Connecting…', 'Setting up a direct, encrypted link between you two.', { spin: true });
-  if (!isHost && !state.player?.meta) return show('Waiting for your partner to pick a movie…', '', { spin: true });
+  if (!isHost && (state.compatPending || (state.compat && !state.compat.stream))) {
+    return show(
+      'Switching to compatibility mode…',
+      "This browser can't decode the movie directly, so your partner will stream it live.",
+      { spin: true }
+    );
+  }
+  if (!isHost && !state.player?.meta && !state.compat) {
+    return show('Waiting for your partner to pick a movie…', '', { spin: true });
+  }
   if (s?.blocked) return show('Ready when you are', 'Your browser needs a tap before it can play.', { tap: true });
   if (s?.intent && s.localBuffering) return show('Buffering…', 'Loading from your partner’s device.', { spin: true });
   if (s?.intent && s.peerBuffering) {
@@ -551,7 +680,9 @@ setInterval(() => {
   state.lastBytes = bytes;
   state.lastBytesAt = now;
   const ahead = state.role === 'host' ? state.guestStatus?.ahead : state.player?.bufferedAhead();
-  if (state.peer?.isOpen && (state.streamer || state.player?.meta)) {
+  if (state.compatSender || state.compat) {
+    $('stat-stream').textContent = 'Live video (compatibility mode)';
+  } else if (state.peer?.isOpen && (state.streamer || state.player?.meta)) {
     const who = state.role === 'host' ? 'partner has' : 'buffered';
     $('stat-stream').textContent = `${formatBytes(rate)}/s · ${who} ${ahead != null ? Math.round(ahead) + ' s' : '—'}`;
   } else {

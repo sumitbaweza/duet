@@ -47,6 +47,7 @@ export class Camera extends EventTarget {
     this.partnerVideo.srcObject = null;
     peer.addEventListener('track', (e) => {
       if (e.detail.track.kind !== 'video') return;
+      if (e.detail.stream && e.detail.stream.id === peer.compatStreamId) return; // the movie, not a face
       this.partnerVideo.srcObject = e.detail.stream || new MediaStream([e.detail.track]);
       this.partnerVideo.play().catch(() => {});
       this.partnerHasTrack = true;

@@ -15,12 +15,15 @@ const SIDE_ZONE = 0.35; // left/right 35% of the width are seek zones
 export class PlayerUI {
   /**
    * @param {{stage: HTMLElement, video: HTMLVideoElement, getDuration: () => number,
-   *          onToggle: () => void, onSeek: (t: number) => void, onFullscreen: () => void}} opts
+   *          getTime?: () => number, onToggle: () => void, onSeek: (t: number) => void,
+   *          onFullscreen: () => void}} opts
    */
-  constructor({ stage, video, getDuration, onToggle, onSeek, onFullscreen }) {
+  constructor({ stage, video, getDuration, getTime, onToggle, onSeek, onFullscreen }) {
     this.stage = stage;
     this.video = video;
     this.getDuration = getDuration;
+    // Movie time; differs from video.currentTime when the <video> shows a live stream.
+    this.getTime = getTime || (() => video.currentTime);
     this.onToggle = onToggle;
     this.onSeek = onSeek;
     this.onFullscreen = onFullscreen;
@@ -171,7 +174,7 @@ export class PlayerUI {
   seekStep(zone) {
     const dir = zone === 'left' ? -1 : 1;
     const duration = this.getDuration() || Infinity;
-    const target = Math.min(duration, Math.max(0, this.video.currentTime + dir * SEEK_STEP));
+    const target = Math.min(duration, Math.max(0, this.getTime() + dir * SEEK_STEP));
     this.onSeek(target);
     this.streak.at = performance.now();
     this.streak.total += SEEK_STEP;
@@ -253,7 +256,7 @@ export class PlayerUI {
   }
 
   render() {
-    if (!this.scrubbing) this.paintProgress(this.video.currentTime);
+    if (!this.scrubbing) this.paintProgress(this.getTime());
     this.renderBuffered();
   }
 

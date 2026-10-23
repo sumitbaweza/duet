@@ -37,6 +37,9 @@ mic (Opus, echo-cancelled) ── RTP audio track ──────────
 | `public/js/peer.js` | RTCPeerConnection with "perfect negotiation" and two pre-negotiated DataChannels |
 | `public/js/host-streamer.js` | Reads the file, remuxes it to fragmented MP4 with mp4box.js, sends with backpressure, seeks on demand |
 | `public/js/fmp4-index.js` | Indexes files that are *already* fragmented MP4 (many downloads/recordings) so they can be seeked and streamed as-is |
+| `public/js/remux-source.js` | Converts MKV/WebM/TS and non-AAC sound to fragmented MP4 on the fly (Mediabunny; AC-3/DTS decoders loaded only when needed) |
+| `public/js/local-player.js` | Lets the host watch converted files through the same pipeline as the partner, via an in-memory loopback |
+| `public/js/compat.js` | Compatibility mode: sends the host's player as live video when the partner can't decode the file |
 | `public/js/guest-player.js` | Reassembles segments into MSE (ManagedMediaSource on iPhone), evicts watched video, asks the host for missing ranges |
 | `public/js/sync.js` | Shared play/pause/seek, host heartbeat, drift correction (0.95×–1.05× nudges, hard seek past 1 s), "wait for partner's buffer" |
 | `public/js/voice.js` | Push-to-enable mic, echo cancellation, auto-ducks the movie while your partner talks |
@@ -67,13 +70,16 @@ Add `?debug` to the URL for signaling logs and `window.duet` state.
 
 ## Known limits and recommended next steps
 
-- **MKV is not supported yet.** mp4box only reads MP4/MOV. Most MKVs hold H.264 + AAC and convert
-  instantly without re-encoding: `ffmpeg -i movie.mkv -c copy movie.mp4`. Next step: do this in-browser
-  with ffmpeg.wasm.
-- **Codecs:** the guest's browser must decode the video codec. H.264 + AAC works everywhere. HEVC/H.265
-  fails on many Android/Firefox browsers, and AC-3/DTS audio fails in Chrome. When audio can't be decoded,
-  the app plays video without sound and shows a warning. Next step: transcode the audio to AAC with
-  ffmpeg.wasm or WebCodecs.
+- **Formats.** Duet picks a delivery path automatically:
+
+  | File | Path | Quality |
+  |---|---|---|
+  | MP4 / MOV / M4V with AAC sound (incl. iPhone & Android recordings) | Sent as-is | Original |
+  | MKV, WebM, MPEG-TS; MP4/MOV with AC-3, E-AC-3, DTS, PCM or MP3 sound | **Converted** in the host's browser (Mediabunny): video copied, sound → AAC stereo | Original picture |
+  | Partner's browser can't decode the video (e.g. HEVC on Firefox), or file only the host's browser can open | **Compatibility mode**: host's player sent as live WebRTC video; partner's controls remote-control the host | Like a good video call, adapts to bandwidth |
+  | Very old codecs no browser plays (Xvid AVI, WMV) | Not supported | Convert with HandBrake |
+
+  Compatibility mode needs the host on Chrome, Edge or Firefox (Safari can't capture a video element).
 - **TURN server for production.** About 10–20% of connections (mobile carriers, corporate Wi-Fi) can't
   connect directly. Set `METERED_DOMAIN` + `METERED_API_KEY`, or `TURN_URLS`/`TURN_USERNAME`/`TURN_CREDENTIAL`.
   Relayed traffic is still end-to-end encrypted, but it costs TURN bandwidth: roughly 1.5–4 GB per movie.

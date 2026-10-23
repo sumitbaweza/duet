@@ -86,9 +86,11 @@ export class GuestPlayer extends EventTarget {
     const video = meta.tracks.find((t) => t.type === 'video' && MS.isTypeSupported(t.mime));
     const audio = meta.tracks.find((t) => t.type === 'audio' && MS.isTypeSupported(t.mime));
     if (!video) {
+      // The host switches to compatibility mode (live video) when it gets this.
       const codecs = meta.tracks.filter((t) => t.type === 'video').map((t) => t.codec).join(', ');
-      this.peer.sendControl({ t: 'reject', reason: `Partner's browser can't decode this file (${codecs})` });
-      this.fail(`This browser can't play this file's codecs (${codecs}). Ask your partner to convert to H.264/AAC MP4.`);
+      this.meta = null;
+      this.peer.sendControl({ t: 'reject', code: 'codec', reason: `Partner's browser can't decode ${codecs}` });
+      this.dispatchEvent(new CustomEvent('unsupported', { detail: codecs }));
       return;
     }
     if (!audio && meta.tracks.some((t) => t.type === 'audio')) {
