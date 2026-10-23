@@ -28,8 +28,13 @@ const indexCache = new WeakMap(); // File -> fragment index, so re-streaming aft
 
 const READ_SIZE = 1024 * 1024; // read 1 MB of the file at a time
 const SEGMENT_SECONDS = 2; // target fragment length
-const HIGH_WATER = 8 * 1024 * 1024; // pause sending when this much is queued in the DataChannel
-const LOW_WATER = 2 * 1024 * 1024;
+// How much may wait in the DataChannel's send queue: ~half a second of the link's speed. Enough to
+// keep the link busy, yet short, because everything queued before a seek or quality switch has to
+// drain before the new position arrives (a fixed 8 MB meant 16 s of "Buffering…" at 4 Mbps).
+const QUEUE_SECONDS = 0.5;
+const MIN_HIGH_WATER = 256 * 1024;
+const MAX_HIGH_WATER = 8 * 1024 * 1024;
+const DEFAULT_HIGH_WATER = 1024 * 1024; // until the link has been measured
 const MAX_GUEST_AHEAD = 90; // default cap on how far ahead the guest buffers (it may ask for less)
 
 // Auto-quality ladder (H.264 re-encodes). Audio (~160 kbps AAC) comes on top.
@@ -83,7 +88,6 @@ export class HostStreamer {
     this.onState = null; // (state) => void, for the stats panel / quality menu
     this.onTooSlow = null; // () => void, when even the lowest re-encode can't keep up
 
-    if (this.channel) this.channel.bufferedAmountLowThreshold = LOW_WATER;
     this.mp4.onError = (mod, msg) => console.warn('mp4box', mod, msg);
     this.mp4.onSegment = (id, _user, buffer, nextSample, last) => {
       this.queue.push({ track: id, buffer, last });
@@ -304,7 +308,12 @@ export class HostStreamer {
   switchTo(variant) {
     this.variant = variant;
     this.slowTicks = 0;
-    const from = this.guestAhead > 0.5 ? this.guestTime + this.guestAhead : this.guestTime;
+    // Queued (not yet appended) data is dropped on the switch, so continue after what's appended.
+    const appended = this.guestAppended ?? this.guestAhead;
+    const from = appended > 0.5 ? this.guestTime + appended : this.guestTime;
+    // The guest already has everything to the end: the new quality applies from the next seek.
+    const duration = this.remuxInfo?.duration;
+    if (duration && from >= duration - 0.5 && this.remux?.run?.done) return this.emitState();
     this.seek(from);
     this.emitState();
   }
@@ -321,7 +330,8 @@ export class HostStreamer {
     const d = drained - L.lastDrained;
     if (dt > 0.2 && d > 0) {
       const sample = (d * 8) / dt;
-      const saturated = buffered > 1024 * 1024 && L.lastBuffered > 1024 * 1024;
+      const full = this.highWater / 2;
+      const saturated = buffered > full && L.lastBuffered > full;
       if (saturated) L.bps = L.bps == null ? sample : L.bps * 0.7 + sample * 0.3;
       else if (L.bps == null || sample > L.bps) L.bps = sample;
     }
@@ -345,8 +355,10 @@ export class HostStreamer {
     const t0 = performance.now();
     const drained0 = this.link.queued - ch.bufferedAmount;
     let sent = 0;
+    // Keep the link full without queuing much junk (it all drains before the movie continues).
+    const cap = Math.max(512 * 1024, this.highWater);
     while (performance.now() - t0 < ms && sent < 24 * 1024 * 1024 && ch.readyState === 'open') {
-      if (ch.bufferedAmount > 6 * 1024 * 1024) {
+      if (ch.bufferedAmount > cap) {
         await new Promise((r) => setTimeout(r, 15));
         continue;
       }
@@ -373,6 +385,9 @@ export class HostStreamer {
   abrTick() {
     if (!this.started || this.closed) return;
     const run = this.remux?.run;
+    // The whole rest of the movie is already converted and sent: nothing left to adapt. (Measuring
+    // "speed" now would see the clock run with no new output and wrongly step quality down.)
+    if (run?.done) return this.emitState();
     // Can this device re-encode fast enough? (media seconds produced per working second)
     if (run && run.variant) {
       const working = (performance.now() - run.startedAt - (run.blockedMs || 0)) / 1000;
@@ -451,9 +466,10 @@ export class HostStreamer {
   }
 
   /** Guest buffer report: decides whether we keep reading the file or rest. */
-  updateGuestStatus({ time, ahead, full, limit }) {
+  updateGuestStatus({ time, ahead, appended, full, limit }) {
     this.guestTime = time ?? this.guestTime;
-    this.guestAhead = ahead ?? 0;
+    this.guestAhead = ahead ?? 0; // includes data still queued on the guest's side
+    this.guestAppended = appended ?? this.guestAhead; // already inside the guest's player
     this.guestFull = !!full;
     this.guestLimit = Math.min(MAX_GUEST_AHEAD, limit || MAX_GUEST_AHEAD);
     if (this.guestAhead < this.guestLimit && !this.guestFull) this.wake();
@@ -624,11 +640,14 @@ export class HostStreamer {
   async sendSegment(track, buffer, extra) {
     const bytes = new Uint8Array(buffer);
     const chunk = this.peer.maxChunk;
-    this.send({ t: 'seg', track, gen: this.gen, size: bytes.byteLength, ...extra });
+    const gen = this.gen;
+    this.send({ t: 'seg', track, gen, size: bytes.byteLength, ...extra });
     for (let o = 0; o < bytes.byteLength; o += chunk) {
-      if (this.channel.bufferedAmount > HIGH_WATER) await this.waitForDrain();
+      if (this.channel.bufferedAmount > this.highWater) await this.waitForDrain();
       // Aborting mid-segment is safe: the guest discards a partial segment on the next header.
-      if (this.closed || this.channel.readyState !== 'open') return;
+      // And it must abort once a seek/quality switch superseded it: the new stream's reset and
+      // headers may already be on the wire, and leftover bytes after them would corrupt it.
+      if (this.closed || this.channel.readyState !== 'open' || gen !== this.gen) return;
       const piece = bytes.slice(o, o + chunk);
       this.channel.send(piece);
       this.bytesSent += piece.byteLength;
@@ -636,7 +655,14 @@ export class HostStreamer {
     }
   }
 
+  get highWater() {
+    const bps = this.link.bps;
+    if (!bps) return DEFAULT_HIGH_WATER;
+    return Math.min(MAX_HIGH_WATER, Math.max(MIN_HIGH_WATER, (bps / 8) * QUEUE_SECONDS));
+  }
+
   waitForDrain() {
+    this.channel.bufferedAmountLowThreshold = Math.floor(this.highWater / 4);
     return new Promise((resolve) => {
       const done = () => {
         this.channel.removeEventListener('bufferedamountlow', done);

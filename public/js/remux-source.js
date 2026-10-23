@@ -236,6 +236,7 @@ export class RemuxSource {
     try {
       await Promise.all([pumpVideo(key), pumpAudio()]);
       if (!run.canceled) await output.finalize();
+      run.done = !run.canceled; // converted through to the end of the movie
     } catch (err) {
       if (!run.canceled) throw err;
     }

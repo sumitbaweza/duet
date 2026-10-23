@@ -9,6 +9,12 @@
 const MS = window.ManagedMediaSource || window.MediaSource;
 const STATUS_EVERY_MS = 1000;
 const MB = 1024 * 1024;
+// Received-but-not-yet-appended data. Above this we tell the sender to stop *now*: the converter can
+// produce a light movie dozens of times faster than real time, and a queue that grows unchecked
+// eats RAM and overflows the browser's video memory (which then discards video at the playhead).
+const QUEUE_MAX = 6 * MB;
+// Largest hole in the buffer we hop over when the playhead is stuck in front of it (seconds).
+const MAX_GAP = 3;
 const MOBILE = matchMedia('(pointer: coarse)').matches || (navigator.deviceMemory ?? 8) <= 4;
 const DEFAULT_BUDGET = (MOBILE ? 60 : 120) * MB; // total bytes we aim to hold in the buffer
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -31,7 +37,9 @@ export class GuestPlayer extends EventTarget {
     this.buffers = new Map(); // trackId -> {track, sb, mime, queue: [ops], ended}
     this.gen = 0;
     this.incoming = null; // segment currently being reassembled
-    this.full = false;
+    this.full = false; // the browser's video memory said "quota exceeded"
+    this.queuedBytes = 0; // received, waiting to be appended
+    this.backlogged = false; // last reported to the sender that the queue is too long
     this.bytesReceived = 0;
     this.closed = false;
     this.budget = DEFAULT_BUDGET;
@@ -41,7 +49,11 @@ export class GuestPlayer extends EventTarget {
     peer.video.addEventListener('message', this.onVideoMessage);
     this.onSeeking = () => this.ensureDataAt(this.video.currentTime);
     video.addEventListener('seeking', this.onSeeking);
-    this.statusTimer = setInterval(() => this.reportStatus(), STATUS_EVERY_MS);
+    this.statusTimer = setInterval(() => {
+      this.skipGap();
+      this.checkHoles();
+      this.reportStatus();
+    }, STATUS_EVERY_MS);
   }
 
   /** Re-derive how many seconds to keep ahead / behind from the stream's bitrate and our budget. */
@@ -68,12 +80,19 @@ export class GuestPlayer extends EventTarget {
           b.queue = [{ abort: true }, ...b.queue.filter((op) => op.remove || op.init)];
           b.ended = false;
         }
+        this.recountQueue();
         this.pumpAll();
       }
       return;
     }
     const seg = this.incoming;
     if (!seg) return;
+    if (seg.received + data.byteLength > seg.size) {
+      // More bytes than announced: the stream is out of step. Drop this segment; the next header
+      // realigns us (and checkHoles() asks again for anything this loses).
+      this.incoming = null;
+      return;
+    }
     if (seg.t !== 'probe') seg.parts.push(new Uint8Array(data)); // speed-test bytes are thrown away
     seg.received += data.byteLength;
     this.bytesReceived += data.byteLength;
@@ -95,7 +114,37 @@ export class GuestPlayer extends EventTarget {
     // Init segments are always needed; media from a superseded seek generation is not.
     if (!seg.init && seg.gen < this.gen) return;
     buf.queue.push({ data: out, init: !!seg.init, last: !!seg.last, mime: seg.mime, bitrate: seg.bitrate });
+    this.queuedBytes += out.byteLength;
+    this.checkBacklog();
     this.pumpAll();
+  }
+
+  recountQueue() {
+    let n = 0;
+    for (const b of this.buffers.values()) for (const op of b.queue) n += op.data?.byteLength || 0;
+    this.queuedBytes = n;
+    this.checkBacklog();
+  }
+
+  /** Tell the sender right away when the queue crosses the limit (and when it has drained again). */
+  checkBacklog() {
+    if (!this.backlogged && this.queuedBytes > QUEUE_MAX) {
+      this.backlogged = true;
+      this.reportStatus();
+    } else if (this.backlogged && this.queuedBytes < QUEUE_MAX / 2) {
+      this.backlogged = false;
+      this.reportStatus();
+    }
+  }
+
+  /** Remove the next queued op from a buffer's queue, keeping the byte count right. */
+  dequeue(b) {
+    const op = b.queue.shift();
+    if (op?.data) {
+      this.queuedBytes = Math.max(0, this.queuedBytes - op.data.byteLength);
+      this.checkBacklog();
+    }
+    return op;
   }
 
   handleMeta(meta) {
@@ -210,7 +259,7 @@ export class GuestPlayer extends EventTarget {
       }
       if (op.data && !op.data.byteLength) {
         // Empty end-of-movie marker (remux mode).
-        b.queue.shift();
+        this.dequeue(b);
         if (op.last) b.ended = true;
         return this.pump(b);
       }
@@ -224,7 +273,7 @@ export class GuestPlayer extends EventTarget {
         if (op.bitrate) this.setBitrate(op.bitrate);
       }
       b.sb.appendBuffer(op.data);
-      b.queue.shift();
+      this.dequeue(b);
       if (op.last) b.ended = true;
       this.full = false;
     } catch (err) {
@@ -240,7 +289,7 @@ export class GuestPlayer extends EventTarget {
         setTimeout(() => this.pump(b), 1000);
       } else {
         console.error('appendBuffer failed', err);
-        b.queue.shift();
+        this.dequeue(b);
       }
     }
   }
@@ -301,6 +350,75 @@ export class GuestPlayer extends EventTarget {
     return ahead;
   }
 
+  /**
+   * Hop over a small hole right in front of the playhead. Holes appear when the browser frees
+   * memory and takes the frames under the playhead with it, or a stream restarts at a later
+   * keyframe; the <video> never plays across one by itself, so without this it waits forever.
+   * It's an ordinary seek, so the sync engine moves the partner along with us.
+   */
+  skipGap() {
+    const v = this.video;
+    let r;
+    try {
+      r = v.buffered;
+    } catch {
+      return;
+    }
+    const t = v.currentTime;
+    const inRange = [...Array(r.length).keys()].some((i) => t >= r.start(i) && t < r.end(i) - 0.05);
+    if (v.seeking || inRange || !this.meta) {
+      this.stuckAt = null;
+      return;
+    }
+    // Only once it's been stuck on the same spot for a full tick (not mid-seek or just starting).
+    if (this.stuckAt !== t) {
+      this.stuckAt = t;
+      return;
+    }
+    for (let i = 0; i < r.length; i++) {
+      const gap = r.start(i) - t;
+      if (gap > 0 && gap <= MAX_GAP && r.end(i) - r.start(i) > 0.5) {
+        this.stuckAt = null;
+        v.currentTime = r.start(i) + 0.05;
+        return;
+      }
+    }
+  }
+
+  /**
+   * A hole where playback is heading (data lost in transit, or freed by the browser) that the
+   * sender has already moved past never fills by itself. Spot it — the hole stays put while media
+   * after it keeps arriving — and ask the sender to stream again from the hole.
+   */
+  checkHoles() {
+    const v = this.video;
+    let r;
+    try {
+      r = v.buffered;
+    } catch {
+      return;
+    }
+    if (!this.meta || v.seeking) return;
+    const t = v.currentTime;
+    let holeAt = t;
+    for (let i = 0; i < r.length; i++) if (t >= r.start(i) - 0.3 && t < r.end(i)) holeAt = r.end(i);
+    let laterEnd = 0;
+    for (let i = 0; i < r.length; i++) if (r.start(i) > holeAt + 0.1) laterEnd = Math.max(laterEnd, r.end(i));
+    if (!laterEnd || holeAt - t > this.aheadLimit * 0.8) {
+      this.hole = null;
+      return;
+    }
+    if (this.hole?.at !== holeAt) {
+      this.hole = { at: holeAt, laterEnd, asked: false };
+      return;
+    }
+    if (!this.hole.asked && laterEnd > this.hole.laterEnd + 0.5) {
+      this.hole.asked = true;
+      for (const b of this.buffers.values()) b.ended = false;
+      this.peer.sendControl({ t: 'need', time: holeAt });
+    }
+  }
+
   /** True if playback could proceed at `time` (or the movie is fully loaded to the end). */
   hasDataAt(time, need = 0.5) {
     const ahead = this.bufferedAhead(time);
@@ -316,11 +434,15 @@ export class GuestPlayer extends EventTarget {
 
   reportStatus() {
     if (!this.meta) return;
+    const appended = this.bufferedAhead();
+    // Count queued-but-not-appended data too, or the sender keeps going while we're swamped.
+    const queuedSeconds = this.bitrate ? (this.queuedBytes * 8) / this.bitrate : 0;
     this.peer.sendControl({
       t: 'status',
       time: this.video.currentTime,
-      ahead: this.bufferedAhead(),
-      full: this.full,
+      ahead: appended + queuedSeconds,
+      appended,
+      full: this.full || this.queuedBytes > QUEUE_MAX,
       limit: Math.round(this.aheadLimit),
     });
   }
@@ -331,6 +453,8 @@ export class GuestPlayer extends EventTarget {
 
   teardownMedia() {
     this.buffers.clear();
+    this.queuedBytes = 0;
+    this.backlogged = false;
     this.incoming = null;
     this.mediaSource = null;
     if (this.objectUrl) {

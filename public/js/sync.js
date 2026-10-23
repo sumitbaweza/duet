@@ -15,6 +15,7 @@ const RESUME_AHEAD = 3; // seconds of buffer needed before resuming after a stal
 const MAX_RESUME_AHEAD = 30;
 const RESTALL_WINDOW_MS = 20_000; // stalling again this soon after resuming doubles the cushion
 const RELAX_AFTER_MS = 60_000; // smooth playback this long halves it again
+const SEEK_GRACE_MS = 2000; // running dry right after a seek is expected, not a sign of a slow link
 const STALL_AHEAD = 0.25;
 const HARD_SEEK_DRIFT = 1.0;
 const SOFT_DRIFT = 0.08;
@@ -48,6 +49,7 @@ export class SyncEngine extends EventTarget {
     this.expectPlay = 0; // count of play/pause/seek calls we made ourselves (vs. native controls)
     this.expectPause = 0;
     this.expectSeek = 0;
+    this.lastSeekAt = 0;
     this.remoteMode = false;
     this.remote = { time: 0, playing: false, at: performance.now() }; // last host heartbeat
 
@@ -111,7 +113,7 @@ export class SyncEngine extends EventTarget {
   }
 
   seek(time) {
-    this.lastLocalAction = performance.now();
+    this.lastLocalAction = this.lastSeekAt = performance.now();
     time = clamp(time, 0, this.duration() || Infinity);
     if (this.remoteMode) this.remote = { time, playing: this.remote.playing, at: performance.now() };
     else this.setTime(time);
@@ -137,6 +139,7 @@ export class SyncEngine extends EventTarget {
         this.setTime(msg.time);
         break;
       case 'seek':
+        this.lastSeekAt = performance.now();
         this.setTime(msg.time);
         break;
       case 'buffering':
@@ -264,7 +267,7 @@ export class SyncEngine extends EventTarget {
     if (!this.localBuffering && this.intent && ahead < STALL_AHEAD && !nearEnd) {
       // Ran dry again soon after resuming: the link is slower than the movie right now, so wait
       // for a bigger cushion before resuming instead of flickering between play and "Buffering…".
-      if (this.lastResumeAt && now - this.lastResumeAt < RESTALL_WINDOW_MS) {
+      if (this.lastResumeAt && now - this.lastResumeAt < RESTALL_WINDOW_MS && now - this.lastSeekAt > SEEK_GRACE_MS) {
         this.resumeAhead = Math.min(MAX_RESUME_AHEAD, this.resumeAhead * 2);
       }
       this.localBuffering = true;
@@ -307,6 +310,7 @@ export class SyncEngine extends EventTarget {
   onNativeSeeking() {
     if (this.remoteMode) return;
     if (this.expectSeek > 0) return void this.expectSeek--;
+    this.lastLocalAction = this.lastSeekAt = performance.now();
     this.send({ t: 'seek', time: this.video.currentTime });
   }
 
