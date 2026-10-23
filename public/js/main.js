@@ -5,6 +5,7 @@ import { SyncEngine } from './sync.js';
 import { Voice } from './voice.js';
 import { Camera } from './camera.js';
 import { PlayerUI } from './player-ui.js';
+import { LocalPlayer } from './local-player.js';
 
 const $ = (id) => document.getElementById(id);
 const video = $('video');
@@ -25,6 +26,7 @@ const state = {
   player: null, // guest only
   file: null, // host only
   fileUrl: null,
+  localPlayer: null, // host only: plays MKV/WebM/AC-3… files through the conversion pipeline
   duration: 0,
   pendingSignals: [],
   lastBytes: 0,
@@ -279,8 +281,12 @@ function startPeer() {
     video,
     role: state.role,
     send: (msg) => peer.sendControl(msg),
-    bufferedAhead: () => (state.role === 'host' ? Infinity : state.player.bufferedAhead()),
-    hasMedia: () => (state.role === 'host' ? !!state.file : !!state.player?.meta),
+    bufferedAhead: () =>
+      state.role === 'host'
+        ? state.localPlayer?.bufferedAhead() ?? Infinity
+        : state.player.bufferedAhead(),
+    hasMedia: () =>
+      state.role === 'host' ? !!state.file && (!state.localPlayer || !!state.localPlayer.meta) : !!state.player?.meta,
     duration: () => state.duration,
   }));
   if (state.role === 'host' && state.file && state.resumeOnRejoin) {
@@ -380,25 +386,44 @@ stage.addEventListener('drop', (e) => {
   e.preventDefault();
   dragDepth = 0;
   $('drop-hint').hidden = true;
-  const file = [...(e.dataTransfer?.files ?? [])].find((f) => /^video\/|\.(mp4|m4v|mov)$/i.test(f.type || f.name));
+  const file = [...(e.dataTransfer?.files ?? [])].find(
+    (f) => /^video\//.test(f.type) || VIDEO_EXTENSIONS.test(f.name)
+  );
   if (file) loadFile(file);
-  else toast('Drop a video file (MP4, M4V or MOV).');
+  else toast('Drop a video file (MP4, MOV, MKV, WebM…).');
 });
+const VIDEO_EXTENSIONS = /\.(mp4|m4v|mov|mkv|webm|ts|m2ts|mts|ogv|avi|wmv|flv)$/i;
 
 async function loadFile(file) {
   // Validate before telling the partner anything.
+  const probe = new HostStreamer(file);
+  let meta;
   try {
-    await new HostStreamer(file).probe();
+    meta = await probe.probe();
   } catch (err) {
     toast(err.message, 10000);
     return;
+  } finally {
+    probe.close();
   }
   state.file = file;
+  state.localPlayer?.close();
+  state.localPlayer = null;
   if (state.fileUrl) URL.revokeObjectURL(state.fileUrl);
-  state.fileUrl = URL.createObjectURL(file);
-  video.src = state.fileUrl;
-  await once(video, 'loadedmetadata');
-  state.duration = video.duration;
+  state.fileUrl = null;
+  if (probe.mode === 'remux') {
+    // The browser can't play this file directly: play it through the conversion pipeline.
+    const local = (state.localPlayer = new LocalPlayer(file, video));
+    local.addEventListener('error', (e) => toast(e.detail, 10000));
+    await local.start();
+    state.duration = meta.duration;
+    if (probe.audioNote) toast(probe.audioNote, 8000);
+  } else {
+    state.fileUrl = URL.createObjectURL(file);
+    video.src = state.fileUrl;
+    await once(video, 'loadedmetadata');
+    state.duration = video.duration;
+  }
   $('stat-file').textContent = `${file.name} · ${formatBytes(file.size)}`;
   if (state.sync) {
     state.sync.intent = false;

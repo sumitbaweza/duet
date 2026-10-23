@@ -12,7 +12,11 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@mediabunny/aac-encoder": "^1.62.1",
+    "@mediabunny/ac3": "^1.62.1",
+    "@mediabunny/dts": "^1.62.1",
     "express": "^5.3.0",
+    "mediabunny": "^1.62.1",
     "mp4box": "^2.4.1",
     "socket.io": "^4.8.4"
   },

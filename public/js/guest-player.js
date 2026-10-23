@@ -149,6 +149,12 @@ export class GuestPlayer extends EventTarget {
         if (this.mediaSource?.readyState === 'open') b.sb.abort();
         return this.pump(b);
       }
+      if (op.data && !op.data.byteLength) {
+        // Empty end-of-movie marker (remux mode).
+        b.queue.shift();
+        if (op.last) b.ended = true;
+        return this.pump(b);
+      }
       if (op.remove) {
         b.queue.shift();
         b.sb.remove(op.remove[0], op.remove[1]);

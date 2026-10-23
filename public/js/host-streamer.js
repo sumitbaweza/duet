@@ -10,9 +10,18 @@
 // Files that are *already* fragmented MP4 (many downloads and screen recordings) take a "passthrough"
 // path instead: their original fragments are sent as-is on a single muxed track (id 0), using an
 // index of fragment start times for seeking, because mp4box can't seek in them.
+//
+// Everything else (MKV, WebM, MPEG-TS, or MP4/MOV whose sound isn't AAC, e.g. AC-3/DTS/PCM) takes the
+// "remux" path: Mediabunny rebuilds it as fragmented MP4 on the fly, copying the video and
+// converting the sound to AAC (see remux-source.js). It's also a single muxed track (id 0).
+//
+// So `mode` is one of: 'mp4box' | 'passthrough' | 'remux'.
 
 import { createFile, MP4BoxBuffer } from '/vendor/mp4box/mp4box.all.mjs';
 import { indexFragments, fragmentAt, rewriteMoofForMse } from './fmp4-index.js';
+import { RemuxSource } from './remux-source.js';
+
+const ISO_BOXES = new Set(['ftyp', 'moov', 'mdat', 'free', 'wide', 'skip', 'pnot']);
 
 const indexCache = new WeakMap(); // File -> fragment index, so re-streaming after a rejoin is instant
 
@@ -53,8 +62,14 @@ export class HostStreamer {
     };
   }
 
-  /** Parse the file header (moov). Resolves with the playable track list or throws if unsupported. */
+  /** Parse the file header. Resolves with the playable track list or throws if unsupported. */
   async probe() {
+    // Only MP4/MOV go through mp4box; anything else (MKV, WebM…) straight to the remux path,
+    // instead of letting mp4box read the whole file looking for a moov.
+    const head = new Uint8Array(await this.file.slice(0, 12).arrayBuffer());
+    const box = String.fromCharCode(...head.subarray(4, 8));
+    if (!ISO_BOXES.has(box)) return this.probeRemux();
+
     let offset = 0;
     let info = null;
     this.mp4.onReady = (i) => (info = i); // fires synchronously inside appendBuffer
@@ -64,17 +79,19 @@ export class HostStreamer {
       const next = this.mp4.appendBuffer(MP4BoxBuffer.fromArrayBuffer(ab, offset), end >= this.file.size);
       offset = next > offset ? next : end;
     }
-    if (!info) {
-      throw new Error(
-        'Could not read this file. Only MP4/MOV/M4V are supported right now. ' +
-          'Convert MKV with: ffmpeg -i movie.mkv -c copy movie.mp4'
-      );
-    }
+    if (!info) return this.probeRemux();
     this.info = info;
+    // Sound that isn't AAC (AC-3, DTS, PCM from cameras, MP3…) won't play everywhere: convert it.
+    // mp4box lists PCM ('sowt', 'lpcm'…) as a "metadata" track, so with no audio track at all but some
+    // other track present, let the converter take a look (it plays video-only files fine too).
+    const sound = info.audioTracks[0];
+    const otherTracks = info.tracks.some((t) => !info.videoTracks.includes(t));
+    if (sound ? !sound.codec.startsWith('mp4a.40') : otherTracks) return this.probeRemux();
     // Fragmented input: the moov has no sample table (it's all in the moofs).
-    this.passthrough =
+    const fragmented =
       info.isFragmented && this.mp4.moov.traks.every((t) => !t.mdia?.minf?.stbl?.stsz?.sample_count);
-    if (this.passthrough) return this.probeFragmented(info);
+    this.mode = fragmented ? 'passthrough' : 'mp4box';
+    if (fragmented) return this.probeFragmented(info);
     const tracks = [...info.videoTracks, ...info.audioTracks].map((t) => ({
       id: t.id,
       type: info.videoTracks.includes(t) ? 'video' : 'audio',
@@ -123,9 +140,30 @@ export class HostStreamer {
     };
   }
 
+  async probeRemux() {
+    this.mode = 'remux';
+    this.remux = new RemuxSource(this.file);
+    const info = await this.remux.probe();
+    this.audioNote = this.remux.audioWasDropped
+      ? `This file's sound (${this.remux.audioDescription}) can't be played in browsers, so it will be silent.`
+      : null;
+    return {
+      t: 'meta',
+      name: this.file.name,
+      size: this.file.size,
+      duration: info.duration,
+      tracks: [{ id: 0, type: 'video', codec: info.codecs, mime: `video/mp4; codecs="${info.codecs}"` }],
+    };
+  }
+
   /** Called once the guest says which tracks its browser can decode. */
   async begin(trackIds, startTime = 0) {
-    if (this.passthrough) {
+    if (this.mode === 'remux') {
+      this.started = true;
+      this.seek(startTime);
+      return;
+    }
+    if (this.mode === 'passthrough') {
       const parts = await Promise.all(this.initRanges.map(([s, e]) => this.file.slice(s, e).arrayBuffer()));
       await this.sendSegment(0, await new Blob(parts).arrayBuffer(), { init: true });
       this.started = true;
@@ -165,6 +203,7 @@ export class HostStreamer {
   close() {
     this.closed = true;
     this.mp4.stop();
+    this.remux?.dispose();
     this.wake();
   }
 
@@ -182,6 +221,7 @@ export class HostStreamer {
   }
 
   async pump() {
+    if (this.mode === 'remux') return this.pumpRemux();
     if (this.pumping) return;
     this.pumping = true;
     try {
@@ -190,7 +230,7 @@ export class HostStreamer {
           const target = this.pendingSeek;
           this.pendingSeek = null;
           this.queue = [];
-          if (this.passthrough) {
+          if (this.mode === 'passthrough') {
             const frags = this.index.fragments;
             this.fragIndex = fragmentAt(frags, target);
             this.offset = frags[this.fragIndex].offset;
@@ -210,7 +250,7 @@ export class HostStreamer {
           await this.sleep(this.guestFull ? 1000 : 0);
           continue;
         }
-        if (this.passthrough) {
+        if (this.mode === 'passthrough') {
           await this.sendFragmentPiece();
           continue;
         }
@@ -224,6 +264,40 @@ export class HostStreamer {
       }
     } catch (err) {
       console.error('streamer stopped', err);
+    } finally {
+      this.pumping = false;
+    }
+  }
+
+  /**
+   * Remux mode: one Mediabunny run per seek position, from the keyframe at/before it to the end.
+   * A new seek cancels the running conversion and starts another one. Pauses while the guest has
+   * plenty buffered (or its buffer is full), which in turn pauses the conversion.
+   */
+  async pumpRemux() {
+    if (this.pumping) {
+      this.remux.cancel(); // the loop below picks up the new pendingSeek
+      return;
+    }
+    this.pumping = true;
+    try {
+      while (!this.closed && this.started && this.channel.readyState === 'open' && this.pendingSeek != null) {
+        const target = this.pendingSeek;
+        this.pendingSeek = null;
+        const gen = this.gen;
+        this.send({ t: 'reset', gen, time: target });
+        const live = () => gen === this.gen && !this.closed;
+        await this.remux.start(target, async (bytes, { init }) => {
+          while (!init && live() && (this.guestFull || this.guestAhead >= MAX_GUEST_AHEAD)) {
+            await this.sleep(this.guestFull ? 1000 : 0);
+          }
+          if (live()) await this.sendSegment(0, bytes, init ? { init: true } : {});
+        });
+        // Reached the end of the movie: tell the guest so it can end the stream cleanly.
+        if (live() && this.pendingSeek == null) this.send({ t: 'seg', track: 0, gen, size: 0, last: true });
+      }
+    } catch (err) {
+      console.error('remux streamer stopped', err);
     } finally {
       this.pumping = false;
     }

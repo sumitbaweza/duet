@@ -25,6 +25,11 @@ const io = new Server(httpServer, { maxHttpBufferSize: 64 * 1024 });
 app.disable('x-powered-by');
 app.use(express.static(path.join(ROOT, 'public')));
 app.use('/vendor/mp4box', express.static(path.join(ROOT, 'node_modules/mp4box/dist')));
+// MKV/WebM/AC-3/DTS support, loaded by the browser only when a file needs it.
+app.use('/vendor/mediabunny', express.static(path.join(ROOT, 'node_modules/mediabunny/dist/bundles')));
+for (const ext of ['ac3', 'dts', 'aac-encoder']) {
+  app.use(`/vendor/mediabunny-${ext}`, express.static(path.join(ROOT, `node_modules/@mediabunny/${ext}/dist/bundles`)));
+}
 // Local testing only: lets automated tests load sample clips without a file picker.
 if (process.env.DUET_TEST_MEDIA === '1') app.use('/test-media', express.static(path.join(ROOT, 'test-media')));
 app.get('/healthz', (_req, res) => res.json({ ok: true, rooms: rooms.size }));

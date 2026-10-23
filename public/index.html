@@ -11,6 +11,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/css/style.css" />
+    <!-- Lets the Mediabunny codec extensions find the core library ("mediabunny"). -->
+    <script type="importmap">
+      { "imports": { "mediabunny": "/vendor/mediabunny/mediabunny.min.mjs" } }
+    </script>
   </head>
   <body>
     <!-- SVG icon sprite -->
@@ -130,7 +134,7 @@
             </div>
           </div>
         </div>
-        <input id="file" type="file" accept="video/mp4,video/quicktime,video/x-m4v,.mp4,.m4v,.mov" hidden />
+        <input id="file" type="file" accept="video/*,.mp4,.m4v,.mov,.mkv,.webm,.ts,.m2ts,.mts,.ogv" hidden />
 
         <!-- Top bar -->
         <header class="topbar chrome">
