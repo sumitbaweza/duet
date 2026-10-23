@@ -1,0 +1,7 @@
+# Always store and check out with Linux line endings: the deploy scripts and configs run on a
+# Linux server, where Windows (CRLF) endings would break them.
+* text=auto eol=lf
+*.svg text eol=lf
+*.png binary
+*.jpg binary
+*.mp4 binary

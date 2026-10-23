@@ -1,0 +1,31 @@
+# /etc/systemd/system/duet.service
+# Runs the Duet server, restarts it if it crashes, and starts it again after a reboot.
+
+[Unit]
+Description=Duet watch-together server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=duet
+WorkingDirectory=/opt/duet
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# Only reachable through Caddy, not directly from the internet.
+Environment=HOST=127.0.0.1
+# TURN settings live here (see duet.env.example).
+EnvironmentFile=-/etc/duet.env
+
+# Basic hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/opt/duet
+
+[Install]
+WantedBy=multi-user.target
