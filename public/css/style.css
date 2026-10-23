@@ -200,11 +200,19 @@ svg { width: 22px; height: 22px; flex: none; }
 .error { color: var(--danger); min-height: 1.4em; margin: 12px 0 0; font-size: 14px; text-align: center; }
 
 @media (max-width: 860px) {
-  .hero { grid-template-columns: 1fr; gap: 28px; margin-top: 0; }
-  .hero-copy { text-align: center; }
-  .lede { margin-left: auto; margin-right: auto; }
-  .features { display: none; }
+  /* Single column: headline → Create/Join card → features. `display: contents` lets the
+     features list (inside .hero-copy) be placed after the card. */
+  .hero { grid-template-columns: 1fr; gap: 0; margin-top: 0; }
+  .hero-copy { display: contents; }
+  .eyebrow { justify-self: center; }
+  .hero h1, .lede { text-align: center; }
   .hero h1 { margin-top: 14px; }
+  .lede { margin: 0 auto 24px; }
+  .card { order: 1; }
+  .features {
+    order: 2; justify-self: center; width: 100%; max-width: 440px; margin-top: 24px;
+    padding: 18px; border-radius: 20px; background: var(--surface-2); border: 1px solid var(--line);
+  }
 }
 @media (max-width: 420px) {
   .card { padding: 20px; }
