@@ -17,7 +17,8 @@ export class Voice extends EventTarget {
     this.stream = null;
     this.peer = null;
     this.senders = [];
-    this.baseVolume = 1;
+    this.baseVolume = 1; // movie level chosen by the user
+    this.callVolume = 1; // partner's voice level chosen by the user
     this.ducked = false;
     this.lastSpeech = 0;
     this.ctx = null;
@@ -69,8 +70,15 @@ export class Voice extends EventTarget {
     this.applyVolume();
   }
 
+  setCallVolume(v) {
+    this.callVolume = v;
+    this.remoteAudio.volume = v;
+    setMuted(this.remoteAudio, v === 0);
+  }
+
   applyVolume() {
     this.video.volume = this.baseVolume * (this.ducked ? DUCK_TO : 1);
+    setMuted(this.video, this.baseVolume === 0);
   }
 
   ensureAudioContext() {
@@ -112,5 +120,19 @@ export class Voice extends EventTarget {
     this.stream = null;
     this.ducked = false;
     this.applyVolume();
+  }
+}
+
+/**
+ * Mute for a level of 0, as well as setting .volume: iPhone/iPad ignore .volume (only the side
+ * buttons change it), but they do honour muting. Only ever unmutes what was muted here.
+ */
+function setMuted(el, mute) {
+  if (mute && !el.muted) {
+    el.muted = true;
+    el.duetMuted = true;
+  } else if (!mute && el.duetMuted) {
+    el.muted = false;
+    el.duetMuted = false;
   }
 }

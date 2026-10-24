@@ -299,11 +299,14 @@ function startPeer() {
 
   if (state.role === 'guest') {
     const player = (state.player = new GuestPlayer(video, peer));
+    // The host picked a movie: show its name right away (even if it ends up in compatibility mode).
+    player.addEventListener('movie', (e) => {
+      $('stat-file').textContent = `${e.detail.name} · ${formatBytes(e.detail.size)}`;
+      setNowPlaying(e.detail.name);
+    });
     player.addEventListener('meta', (e) => {
       state.compatPending = false;
       state.duration = e.detail.duration;
-      $('stat-file').textContent = `${e.detail.name} · ${formatBytes(e.detail.size)}`;
-      setNowPlaying(e.detail.name);
       refreshOverlay();
       ui.render();
     });
@@ -534,6 +537,7 @@ async function loadFile(file) {
   state.compatSender?.stop();
   state.compatSender = null;
   state.file = file;
+  setNowPlaying(file.name); // now, not after loading: the old movie is being replaced from here on
   state.nativeOnly = nativeOnly;
   state.duration = 0; // the new movie's length is known once its metadata loads
   // A new movie starts paused. Done before the loading below so a "play" pressed meanwhile sticks.
@@ -559,7 +563,6 @@ async function loadFile(file) {
     state.duration = video.duration;
   }
   $('stat-file').textContent = `${file.name} · ${formatBytes(file.size)}`;
-  setNowPlaying(file.name);
   if (state.peer?.isOpen) startStreaming();
   refreshOverlay();
   ui.render();
@@ -862,18 +865,58 @@ $('play').onclick = () => {
   state.sync?.toggle();
 };
 
-// Volume: the slider sets the movie level (voice ducking scales it while your partner talks).
-let lastVolume = 1;
-const setVolume = (v) => {
-  voice.setBaseVolume(v);
-  $('volume').value = v;
-  $('volume-group').classList.toggle('muted-on', v === 0);
+// Volume: two independent levels, the movie and the call (your partner's voice). Voice ducking
+// still lowers the movie while your partner talks. Levels are remembered on this device; mutes
+// are not, so nobody starts the next movie night wondering why there's no sound.
+const VOLUME_KEY = 'duet:volume';
+// iPhone/iPad ignore .volume (only the side buttons set it): there the rows only mute/unmute.
+const canSetVolume = (() => {
+  const a = document.createElement('audio');
+  try {
+    a.volume = 0.5;
+  } catch {}
+  return a.volume === 0.5;
+})();
+const volume = { movie: 1, call: 1 };
+const lastLevel = { movie: 1, call: 1 };
+try {
+  const saved = JSON.parse(safeGet(localStorage, VOLUME_KEY) || '{}');
+  for (const kind of ['movie', 'call']) if (saved[kind] > 0 && saved[kind] <= 1) volume[kind] = lastLevel[kind] = saved[kind];
+} catch {}
+
+function setLevel(kind, v) {
+  v = Math.min(1, Math.max(0, Math.round(v * 100) / 100));
+  volume[kind] = v;
+  if (v > 0) lastLevel[kind] = v;
+  if (kind === 'movie') voice.setBaseVolume(v);
+  else voice.setCallVolume(v);
+  $(`${kind}-vol`).value = v;
+  $(`${kind}-vol-val`).textContent = v === 0 ? 'Muted' : canSetVolume ? `${Math.round(v * 100)}%` : 'On';
+  $(`${kind}-row`).classList.toggle('off', v === 0);
+  $(`${kind}-mute`).setAttribute('aria-label', `${v === 0 ? 'Unmute' : 'Mute'} ${kind === 'movie' ? 'movie' : 'call'}`);
+  $('vol-btn').classList.toggle('muted-on', volume.movie === 0);
+  safeSet(localStorage, VOLUME_KEY, JSON.stringify(lastLevel));
+}
+const toggleLevel = (kind) => setLevel(kind, volume[kind] === 0 ? lastLevel[kind] : 0);
+for (const kind of ['movie', 'call']) {
+  $(`${kind}-vol`).addEventListener('input', (e) => setLevel(kind, +e.target.value));
+  $(`${kind}-mute`).onclick = () => toggleLevel(kind);
+  setLevel(kind, volume[kind]);
+}
+if (!canSetVolume) {
+  $('vol-pop').classList.add('no-volume');
+  $('vol-note').hidden = false;
+}
+
+function setVolumeOpen(open) {
+  $('vol-pop').hidden = !open;
+  $('vol-btn').setAttribute('aria-expanded', String(open));
+  ui.hold('volume', open);
+}
+$('vol-btn').onclick = (e) => {
+  e.stopPropagation();
+  setVolumeOpen($('vol-pop').hidden);
 };
-$('volume').addEventListener('input', (e) => {
-  lastVolume = +e.target.value || lastVolume;
-  setVolume(+e.target.value);
-});
-$('mute').onclick = () => setVolume(+$('volume').value === 0 ? lastVolume || 1 : 0);
 
 $('mic').onclick = async () => {
   try {
@@ -924,6 +967,7 @@ document.addEventListener('pointerdown', (e) => {
   if (!$('react-pop').hidden && !e.target.closest('.react-wrap')) setReactOpen(false);
   if (!$('stats').hidden && !e.target.closest('#stats, #stats-btn')) setStatsOpen(false);
   if (!$('quality-pop').hidden && !e.target.closest('.quality-wrap')) setQualityOpen(false);
+  if (!$('vol-pop').hidden && !e.target.closest('.vol-wrap')) setVolumeOpen(false);
 });
 
 function floatReaction(emoji) {
@@ -1041,9 +1085,14 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'f') toggleFullscreen();
   else if (e.key === 'm') $('mic').click();
   else if (e.key === 'c') $('cam').click();
-  else if (e.key === 'Escape') {
+  else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    setLevel('movie', volume.movie + (e.key === 'ArrowUp' ? 0.1 : -0.1));
+    toast(`Movie volume ${Math.round(volume.movie * 100)}%`, 1200);
+  } else if (e.key === 'Escape') {
     setReactOpen(false);
     setStatsOpen(false);
+    setVolumeOpen(false);
   }
 });
 
