@@ -1,6 +1,6 @@
 {
-  "name": "Duet — watch together",
-  "short_name": "Duet",
+  "name": "Duet Watch: watch together",
+  "short_name": "Duet Watch",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f0d14",

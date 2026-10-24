@@ -8,7 +8,7 @@ What you'll end up with, all on one small Linux server:
 ```
 
 Time: about 30 minutes. Cost: about €4–6/month.
-Commands below are for **Ubuntu 24.04** and assume the address **duet.sumitbaweza.com**. Replace it everywhere if you
+Commands below are for **Ubuntu 24.04** and assume the address **duetwatch.com**. Replace it everywhere if you
 pick another, including in `deploy/Caddyfile`, `deploy/turnserver.conf` and `deploy/duet.env.example`.
 
 ---
@@ -28,13 +28,13 @@ Check each provider's current prices and included traffic.
 
 ## 3. Point your domain at it
 
-At your domain provider (wherever sumitbaweza.com's DNS is managed), add:
+At your domain provider (GoDaddy, where duetwatch.com's DNS is managed), add:
 
 | Type | Name | Value |
 |---|---|---|
 | A | `duet` | your server's IPv4 address |
 
-Wait a few minutes until `ping duet.sumitbaweza.com` shows that IP.
+Wait a few minutes until `ping duetwatch.com` shows that IP.
 
 ## 4. Set up the server
 
@@ -124,12 +124,12 @@ All three should say `active (running)`.
 
 ## 5. Check it works
 
-1. Open **https://duet.sumitbaweza.com/healthz** in your browser. You should see `{"ok":true,...}` with a padlock (HTTPS).
-2. Open **https://duet.sumitbaweza.com/api/ice-servers**. It should list a `turn:` entry with a `username` like
+1. Open **https://duetwatch.com/healthz** in your browser. You should see `{"ok":true,...}` with a padlock (HTTPS).
+2. Open **https://duetwatch.com/api/ice-servers**. It should list a `turn:` entry with a `username` like
    `1793...:duet`.
 3. Test the relay: open the
    [Trickle ICE test page](https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/), remove the
-   default server, then add `turn:duet.sumitbaweza.com:3478` with the username and credential from step 2. Click
+   default server, then add `turn:duetwatch.com:3478` with the username and credential from step 2. Click
    **Gather candidates**. A row of type **relay** means TURN works.
 4. Real test: one person on Wi-Fi, the other on **mobile data**. Create and join a room, and play a movie. The pill in the
    player's top bar shows **Direct** or **Relayed**. Both should play.
@@ -144,6 +144,15 @@ sudo bash /opt/duet/deploy/update.sh
 
 It pulls the code, installs dependencies, restarts the app and prints the health check. A restart clears active rooms, so
 anyone mid-movie just rejoins with the same code.
+
+## Log retention (privacy)
+
+The Privacy Policy promises that server logs, including the TURN relay's connection logs with IP
+addresses, are deleted within 14 days. Set that up once on the server (safe to run again):
+
+```bash
+bash /opt/duet/deploy/log-retention.sh
+```
 
 ## Day-to-day
 

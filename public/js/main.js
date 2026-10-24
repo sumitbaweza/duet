@@ -130,14 +130,15 @@ if (params.get('room')) {
 $('create').onclick = () => {
   const name = requireName();
   if (!name) return;
-  unlockMedia();
-  socket.emit('create-room', { name }, onJoined);
+  withTerms('Accept & create room', () => {
+    unlockMedia();
+    socket.emit('create-room', { name, terms: TERMS_VERSION }, onJoined);
+  });
 };
 $('join-form').onsubmit = (e) => {
   e.preventDefault();
   const name = requireName();
   if (!name) return;
-  unlockMedia();
   const code = getCode();
   if (code.length !== 6) {
     $('code-boxes').classList.remove('shake');
@@ -145,10 +146,66 @@ $('join-form').onsubmit = (e) => {
     $('code-boxes').classList.add('shake');
     return showHomeError('Room codes are 6 characters.');
   }
-  const saved = loadSession();
-  const token = saved?.code === code ? saved.token : undefined;
-  socket.emit('join-room', { code, name, token }, onJoined);
+  withTerms('Accept & join room', () => {
+    unlockMedia();
+    const saved = loadSession();
+    const token = saved?.code === code ? saved.token : undefined;
+    socket.emit('join-room', { code, name, token, terms: TERMS_VERSION }, onJoined);
+  });
 };
+
+// Terms of Service / Privacy Policy: accepted once per device, and again whenever they change
+// (bump TERMS_VERSION here and in server/index.js together).
+const TERMS_VERSION = '2026-10-24';
+const TERMS_KEY = 'duet:terms';
+let termsProceed = null;
+let termsReturnFocus = null;
+
+function withTerms(acceptLabel, proceed) {
+  if (safeGet(localStorage, TERMS_KEY) === TERMS_VERSION) return proceed();
+  termsProceed = proceed;
+  termsReturnFocus = document.activeElement;
+  $('terms-accept').textContent = acceptLabel;
+  $('terms-modal').hidden = false;
+  document.body.classList.add('modal-open');
+  $('terms-accept').focus();
+}
+function closeTerms() {
+  $('terms-modal').hidden = true;
+  document.body.classList.remove('modal-open');
+  termsProceed = null;
+  termsReturnFocus?.focus?.();
+}
+$('terms-accept').onclick = () => {
+  const proceed = termsProceed;
+  safeSet(localStorage, TERMS_KEY, TERMS_VERSION);
+  closeTerms();
+  proceed?.();
+};
+$('terms-cancel').onclick = closeTerms;
+$('terms-modal').addEventListener('click', (e) => {
+  if (e.target === $('terms-modal')) closeTerms(); // tap outside the card
+});
+$('terms-modal').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') return closeTerms();
+  if (e.key !== 'Tab') return;
+  // Keep keyboard focus inside the dialog.
+  const items = [...$('terms-modal').querySelectorAll('a[href], button')];
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+});
+$('cta-start').addEventListener('click', (e) => {
+  e.preventDefault();
+  $('home-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => $('name').focus({ preventScroll: true }), 450);
+});
 
 function myName() {
   const name = $('name').value.trim().replace(/\s+/g, ' ');
@@ -193,6 +250,10 @@ async function onJoined(res) {
   dlog('joined', res?.ok, res?.role, 'peerOnline', res?.peerOnline);
   if (!res?.ok) {
     if (res?.field === 'name') return requireName();
+    if (res?.field === 'terms') {
+      safeSet(localStorage, TERMS_KEY, ''); // the server has newer terms: ask again
+      return showHomeError(res.error);
+    }
     return showHomeError(res?.error || 'Something went wrong.');
   }
   const reconnect = state.code === res.state.code;
@@ -1099,7 +1160,7 @@ document.addEventListener('keydown', (e) => {
 async function copyInvite() {
   const url = `${location.origin}/?room=${state.code}`;
   if (navigator.share && matchMedia('(pointer: coarse)').matches) {
-    navigator.share({ title: 'Watch with me on Duet', text: `Room code ${state.code}`, url }).catch(() => {});
+    navigator.share({ title: 'Watch with me on Duet Watch', text: `Room code ${state.code}`, url }).catch(() => {});
   } else {
     await navigator.clipboard?.writeText(url).catch(() => {});
     toast('Invite link copied');

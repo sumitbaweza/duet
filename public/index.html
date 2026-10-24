@@ -4,12 +4,71 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0a10" />
-    <title>Duet — watch together</title>
+    <title>Duet Watch: Watch Movies Together Online, Free &amp; Private</title>
+    <meta name="description" content="Watch movies together online in perfect sync, straight from your phone or laptop. No uploads, no sign-up, free. Encrypted voice &amp; video call built in." />
+    <meta name="author" content="Sumit Baweza" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://duetwatch.com/" />
+    <meta name="application-name" content="Duet Watch" />
+    <meta name="apple-mobile-web-app-title" content="Duet Watch" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Duet Watch" />
+    <meta property="og:url" content="https://duetwatch.com/" />
+    <meta property="og:title" content="Duet Watch: Movie night, together wherever you are" />
+    <meta property="og:description" content="Watch your own movies and videos in perfect sync with your partner or friend. No uploads, no sign-up, free and end-to-end encrypted." />
+    <meta property="og:image" content="https://duetwatch.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Duet Watch: watch movies together, privately" />
+    <meta property="og:locale" content="en_IN" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Duet Watch: Movie night, together wherever you are" />
+    <meta name="twitter:description" content="Watch your own movies and videos in perfect sync with your partner or friend. No uploads, no sign-up, free." />
+    <meta name="twitter:image" content="https://duetwatch.com/og-image.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "name": "Duet Watch",
+            "url": "https://duetwatch.com/",
+            "description": "Watch movies and videos together in perfect sync from your own device, with built-in encrypted voice and video call. No uploads, no sign-up.",
+            "applicationCategory": "MultimediaApplication",
+            "operatingSystem": "Any (web browser)",
+            "browserRequirements": "Requires a modern browser such as Chrome, Edge or Safari",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
+            "featureList": [
+              "Watch local video files together without uploading",
+              "End-to-end encrypted peer-to-peer streaming",
+              "Synchronized play, pause and seek for both viewers",
+              "Automatic quality for slow networks",
+              "Built-in voice and video call",
+              "Plays MP4, MKV, MOV, WebM, 4K and HEVC videos",
+              "No sign-up, free to use"
+            ],
+            "author": { "@type": "Person", "name": "Sumit Baweza", "url": "https://sumitbaweza.com" }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              { "@type": "Question", "name": "Is Duet Watch really free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Duet Watch is free to use, with no subscription, trial or account." } },
+              { "@type": "Question", "name": "Do I need to sign up or install an app?", "acceptedAnswer": { "@type": "Answer", "text": "No. Open the website, type your name and create or join a room. It works in modern browsers on phones, tablets and computers." } },
+              { "@type": "Question", "name": "Is my movie uploaded anywhere?", "acceptedAnswer": { "@type": "Answer", "text": "No. The video file stays on the host's device and is streamed directly to the other person while you watch. Our server never receives the video." } },
+              { "@type": "Question", "name": "Is it private and secure?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. The movie, voice, camera video and reactions are end-to-end encrypted between the two devices using WebRTC. The server only helps the devices connect." } },
+              { "@type": "Question", "name": "Which video formats can I play?", "acceptedAnswer": { "@type": "Answer", "text": "MP4, M4V, MOV, MKV, WebM and more, including 4K phone recordings, HEVC/H.265 video and AC-3, E-AC-3 and DTS sound." } },
+              { "@type": "Question", "name": "What internet speed do we need?", "acceptedAnswer": { "@type": "Answer", "text": "For HD, about 3 to 10 Mbps of upload speed on the host's side works well. On slower connections auto quality lowers the picture so playback keeps going, from around 1 Mbps." } },
+              { "@type": "Question", "name": "How many people can watch together?", "acceptedAnswer": { "@type": "Answer", "text": "Duet Watch is made for two people, which keeps the connection direct, private and high quality." } },
+              { "@type": "Question", "name": "Can I watch any movie with Duet Watch?", "acceptedAnswer": { "@type": "Answer", "text": "Only share videos you own or have the right to watch and share. You are responsible for what you play." } }
+            ]
+          }
+        ]
+      }
+    </script>
     <link rel="stylesheet" href="/css/style.css" />
     <!-- Lets the Mediabunny codec extensions find the core library ("mediabunny"). -->
     <script type="importmap">
@@ -40,29 +99,45 @@
       <symbol id="i-lock" viewBox="0 0 24 24"><path fill="currentColor" d="M18 8h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3.1-9H8.9V6a3.1 3.1 0 0 1 6.2 0v2z"/></symbol>
       <symbol id="i-gear" viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></symbol>
       <symbol id="i-heart" viewBox="0 0 24 24"><path fill="currentColor" d="m12 21.35-1.45-1.32C5.4 15.36 2 12.28 2 8.5A5.5 5.5 0 0 1 7.5 3c1.74 0 3.41.81 4.5 2.09A6 6 0 0 1 16.5 3 5.5 5.5 0 0 1 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path fill="currentColor" d="M7 2v11h3v9l7-12h-4l4-8z"/></symbol>
+      <symbol id="i-wifi" viewBox="0 0 24 24"><path fill="currentColor" d="m1 9 2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8 3 3 3-3a4.24 4.24 0 0 0-6 0zm-4-4 2 2a7.07 7.07 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><path fill="currentColor" d="M17 1.01 7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></symbol>
+      <symbol id="i-tv" viewBox="0 0 24 24"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></symbol>
+      <symbol id="i-person" viewBox="0 0 24 24"><path fill="currentColor" d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path fill="currentColor" d="m21.41 11.58-9-9A2 2 0 0 0 11 2H4a2 2 0 0 0-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path fill="currentColor" d="M10 4H4a2 2 0 0 0-1.99 2L2 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 24 24"><path fill="currentColor" d="M19.35 10.04A7.49 7.49 0 0 0 12 4c-1.48 0-2.85.43-4.01 1.17l1.46 1.46A5.5 5.5 0 0 1 17.5 11v.5H19a3 3 0 0 1 1.44 5.62l1.45 1.45A4.96 4.96 0 0 0 24 14.5c0-2.64-2.05-4.78-4.65-4.96zM3 5.27l2.75 2.74C2.56 8.15 0 10.77 0 14a6 6 0 0 0 6 6h11.73l2 2L21 20.73 4.27 4 3 5.27zM7.73 10l8 8H6a4 4 0 0 1 0-8h1.73z"/></symbol>
     </svg>
 
     <!-- ============================== Home ============================== -->
     <main id="home" class="home">
       <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
 
-      <nav class="home-nav">
-        <a class="brand" href="/"><img src="/icon.svg" alt="" width="48" height="48" /><span>Duet</span></a>
+      <nav class="home-nav" aria-label="Main">
+        <a class="brand" href="/" aria-label="Duet Watch home"><img src="/icon.svg" alt="" width="48" height="48" /><span>Duet <em>Watch</em></span></a>
+        <div class="nav-links">
+          <a href="#how">How it works</a>
+          <a href="#features">Features</a>
+          <a href="#faq">FAQ</a>
+        </div>
         <a class="maker" href="https://sumitbaweza.com" target="_blank" rel="noopener">
           <span class="maker-text"><b>App By SUMIT BAWEZA</b><small>Click me</small></span>
           <span class="maker-arrow" aria-hidden="true">→</span>
         </a>
       </nav>
 
-      <section class="hero">
+      <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <span class="eyebrow"><svg><use href="#i-lock" /></svg> Private &amp; peer-to-peer</span>
-          <h1>Movie night, <span class="grad">together</span> wherever you are.</h1>
-          <p class="lede">Play a movie from your device and watch it in perfect sync with someone far away. It streams straight from you to them. No uploads, no servers in between.</p>
-          <ul class="features">
-            <li><svg><use href="#i-sync" /></svg><span><b>Frame-perfect sync</b>Play, pause and seek together.</span></li>
-            <li><svg><use href="#i-mic" /></svg><span><b>Talk while you watch</b>Voice chat and face-cam bubbles.</span></li>
-            <li><svg><use href="#i-heart" /></svg><span><b>Made for two</b>Reactions, rejoin, resume.</span></li>
+          <span class="eyebrow"><svg><use href="#i-lock" /></svg> Private &amp; peer-to-peer watch party</span>
+          <h1 id="hero-title">Movie night, <span class="grad">together</span> wherever you are.</h1>
+          <p class="lede">Watch a movie or video from your own phone or laptop in perfect sync with your partner or best friend, and talk face to face while you watch. Nothing is uploaded, and no sign-up is needed. It's free.</p>
+          <ul class="trust">
+            <li><svg><use href="#i-tag" /></svg>100% free</li>
+            <li><svg><use href="#i-person" /></svg>No sign-up</li>
+            <li><svg><use href="#i-cloud-off" /></svg>No uploads</li>
+            <li><svg><use href="#i-shield" /></svg>End-to-end encrypted</li>
           </ul>
         </div>
 
@@ -98,9 +173,338 @@
           </form>
 
           <p id="home-error" class="error" role="alert"></p>
+          <p class="card-legal">By starting or joining you agree to our <a href="/terms">Terms</a> &amp; <a href="/privacy">Privacy Policy</a>.</p>
         </div>
       </section>
+
+      <!-- What it is -->
+      <section class="section intro" aria-labelledby="intro-title">
+        <div class="mock-stage" aria-hidden="true">
+          <div class="mock-laptop">
+            <div class="mock-screen">
+              <div class="mock-movie"><span class="mock-sun"></span><span class="mock-hills"></span></div>
+              <div class="mock-title"><svg><use href="#i-film" /></svg> Our Favourite Movie</div>
+              <div class="mock-bubbles"><span class="face f1">P</span><span class="face f2">R</span></div>
+              <div class="mock-bar"><span class="mock-play"></span><span class="mock-track"><i style="width: 46%"></i></span><span class="mock-time">42:17</span></div>
+              <span class="mock-react r1">❤️</span><span class="mock-react r2">😂</span>
+            </div>
+            <div class="mock-base"></div>
+          </div>
+          <div class="mock-phone">
+            <div class="mock-phone-screen">
+              <div class="mock-movie small"><span class="mock-sun"></span><span class="mock-hills"></span></div>
+              <div class="mock-bar"><span class="mock-play"></span><span class="mock-track"><i style="width: 46%"></i></span></div>
+              <span class="mock-sync"><svg><use href="#i-sync" /></svg> In sync</span>
+            </div>
+          </div>
+        </div>
+        <div class="section-copy">
+          <span class="kicker">What is Duet Watch?</span>
+          <h2 id="intro-title">A private cinema for two, right in your browser</h2>
+          <p>Duet Watch lets two people watch the same video at the same moment, even when you're cities or countries apart. One of you picks a movie, a series episode or a phone recording that's <b>already on your device</b>. Duet Watch streams it straight to the other person, and keeps both screens perfectly in step.</p>
+          <p>Talk, laugh and see each other with the built-in voice and video call, send reactions, and control the movie together. No app to install, no account, no cost.</p>
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section class="section" id="how" aria-labelledby="how-title">
+        <div class="section-head">
+          <span class="kicker">How it works</span>
+          <h2 id="how-title">Start watching together in 3 easy steps</h2>
+          <p>Takes less than a minute, on a phone, tablet or laptop.</p>
+        </div>
+        <ol class="steps">
+          <li class="step">
+            <span class="step-num">1</span>
+            <div class="step-icon"><svg><use href="#i-person" /></svg></div>
+            <h3>Create a room</h3>
+            <p>Type your name and tap <b>Create room</b>. You'll get a private 6-letter room code.</p>
+          </li>
+          <li class="step">
+            <span class="step-num">2</span>
+            <div class="step-icon"><svg><use href="#i-link" /></svg></div>
+            <h3>Invite your person</h3>
+            <p>Send the invite link or code on WhatsApp or any chat. They open it, type their name and join.</p>
+          </li>
+          <li class="step">
+            <span class="step-num">3</span>
+            <div class="step-icon"><svg><use href="#i-film" /></svg></div>
+            <h3>Pick a movie &amp; press play</h3>
+            <p>Choose a video from your device. It starts in seconds for both of you. Turn on mic and camera if you like.</p>
+          </li>
+        </ol>
+      </section>
+
+      <!-- Highlights -->
+      <div id="features" class="highlights">
+        <section class="section row" aria-labelledby="h-local">
+          <div class="visual" aria-hidden="true">
+            <div class="flow">
+              <div class="node"><svg><use href="#i-phone" /></svg><b>Your device</b><small>movie.mp4</small></div>
+              <div class="wire"><span class="packet"></span><span class="packet p2"></span><span class="packet p3"></span><em>direct</em></div>
+              <div class="node"><svg><use href="#i-tv" /></svg><b>Your partner</b><small>watching</small></div>
+            </div>
+            <div class="server-off"><svg><use href="#i-cloud-off" /></svg> Our server: never receives your movie</div>
+          </div>
+          <div class="section-copy">
+            <span class="kicker">Your files, no uploads</span>
+            <h2 id="h-local">Watch the videos you already have</h2>
+            <p>Movies you downloaded, shows on your laptop, videos you shot on your phone: if it's on your device, you can watch it together. Duet Watch streams the file <b>directly from your device to your partner's</b>. Nothing is uploaded to a website, so there's no waiting, no storage limit and no copy left behind.</p>
+            <ul class="ticks">
+              <li>Starts in seconds, even for a 2-hour movie</li>
+              <li>Plays MP4, MKV, MOV, WebM and more, including HEVC/H.265 video and AC-3/DTS surround sound</li>
+              <li>Your file never leaves your device except to reach your partner</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section row flip" aria-labelledby="h-private">
+          <div class="visual" aria-hidden="true">
+            <div class="vault">
+              <div class="vault-shield"><svg><use href="#i-shield" /></svg></div>
+              <div class="chips">
+                <span><svg><use href="#i-film" /></svg> Movie <svg class="lk"><use href="#i-lock" /></svg></span>
+                <span><svg><use href="#i-mic" /></svg> Voice <svg class="lk"><use href="#i-lock" /></svg></span>
+                <span><svg><use href="#i-cam" /></svg> Video <svg class="lk"><use href="#i-lock" /></svg></span>
+                <span><svg><use href="#i-heart" /></svg> Reactions <svg class="lk"><use href="#i-lock" /></svg></span>
+              </div>
+              <p class="vault-note">Our server never sees the movie, voice or video</p>
+            </div>
+          </div>
+          <div class="section-copy">
+            <span class="kicker">Private by design</span>
+            <h2 id="h-private">Encrypted end to end. Not even our server knows what you watch.</h2>
+            <p>Your movie, voice, video and reactions travel between your two devices with the same encryption technology used by video-calling apps (WebRTC, DTLS-SRTP). Our server only helps your devices find each other. It never receives what you watch or say, and we keep no copy of anything.</p>
+            <ul class="ticks">
+              <li>No account, no email, no phone number</li>
+              <li>No ads, no tracking cookies</li>
+              <li>Rooms disappear when you're done</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section row" aria-labelledby="h-sync">
+          <div class="visual" aria-hidden="true">
+            <div class="sync-demo">
+              <div class="sync-screen"><span class="who">Priya</span><span class="mock-track"><i></i></span><b>1:12:05</b></div>
+              <div class="sync-link"><svg><use href="#i-sync" /></svg> in sync, within a fraction of a second</div>
+              <div class="sync-screen"><span class="who">Rahul</span><span class="mock-track"><i></i></span><b>1:12:05</b></div>
+              <div class="remote-row">
+                <span><svg><use href="#i-play" /></svg></span><span><svg><use href="#i-pause" /></svg></span><span>−5s</span><span>+5s</span>
+              </div>
+            </div>
+          </div>
+          <div class="section-copy">
+            <span class="kicker">Perfect sync, shared remote</span>
+            <h2 id="h-sync">One movie, two screens, zero “wait, where are you?”</h2>
+            <p>Either of you can play, pause or jump to any scene, and the other screen follows instantly. Duet Watch keeps checking both players and quietly corrects any drift, so a joke lands for both of you at the same moment.</p>
+            <ul class="ticks">
+              <li>Double-tap left or right to skip 5 seconds</li>
+              <li>If one of you buffers, both pause and resume together</li>
+              <li>Lost connection? Rejoin and it resumes from the same spot</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section row flip" aria-labelledby="h-network">
+          <div class="visual" aria-hidden="true">
+            <div class="ladder">
+              <div class="ladder-head"><svg><use href="#i-wifi" /></svg> Auto quality <span class="pill-mini">Auto</span></div>
+              <div class="rung"><span>Original</span><i style="--w: 100%"></i></div>
+              <div class="rung on"><span>1080p</span><i style="--w: 78%"></i></div>
+              <div class="rung"><span>720p</span><i style="--w: 56%"></i></div>
+              <div class="rung"><span>480p</span><i style="--w: 36%"></i></div>
+              <p class="ladder-note">Adjusts every second to your connection</p>
+            </div>
+          </div>
+          <div class="section-copy">
+            <span class="kicker">Adapts to your network</span>
+            <h2 id="h-network">Smooth playback on Wi-Fi, 4G and slower connections</h2>
+            <p>Like the big streaming apps, Duet Watch measures your connection while you watch and picks the best quality that plays without stopping. On a fast connection you get the original file quality. When the network slows down, quality steps down instead of buffering, and goes back up when things improve.</p>
+            <ul class="ticks">
+              <li>Original, 1080p, 720p, 480p and 360p levels</li>
+              <li>Choose a quality yourself any time, or leave it on Auto</li>
+              <li>Direct connection first, secure relay as a backup</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section row" aria-labelledby="h-screen">
+          <div class="visual" aria-hidden="true">
+            <div class="bigscreen">
+              <div class="small-phone"><svg><use href="#i-phone" /></svg><span class="badge4k">4K</span></div>
+              <div class="arrow-flow">→</div>
+              <div class="big-tv"><div class="mock-movie"><span class="mock-sun"></span><span class="mock-hills"></span></div><span class="tv-label">Same quality, big screen</span></div>
+              <div class="formats"><span>MP4</span><span>MOV</span><span>MKV</span><span>HEVC</span><span>WebM</span></div>
+            </div>
+          </div>
+          <div class="section-copy">
+            <span class="kicker">Phone videos on the big screen</span>
+            <h2 id="h-screen">Share your memories in full quality</h2>
+            <p>Trip videos, wedding clips, a concert you recorded in 4K: play them from your phone and your partner sees them on their laptop or TV in the same sharp quality, not a blurry screen-share. Duet Watch even handles the special formats phones record in (like iPhone HEVC video) and converts them on the fly when the other device needs it.</p>
+          </div>
+        </section>
+
+        <section class="section row flip" aria-labelledby="h-couples">
+          <div class="visual" aria-hidden="true">
+            <div class="couple">
+              <div class="couple-screen">
+                <div class="mock-movie"><span class="mock-sun"></span><span class="mock-hills"></span></div>
+                <div class="couple-faces"><span class="face big f1">P</span><span class="face big f2">R</span></div>
+                <span class="mock-react r1">❤️</span><span class="mock-react r3">🥰</span><span class="mock-react r2">😂</span>
+              </div>
+              <div class="couple-controls">
+                <span><svg><use href="#i-mic" /></svg> Voice on</span>
+                <span><svg><use href="#i-cam" /></svg> Camera on</span>
+                <span><svg><use href="#i-vol" /></svg> Movie 70% · Call 100%</span>
+              </div>
+            </div>
+          </div>
+          <div class="section-copy">
+            <span class="kicker">Made for long-distance love</span>
+            <h2 id="h-couples">Date night, even when you're miles apart</h2>
+            <p>Duet Watch is designed for two: your partner, your best friend, family far away. See each other in small face-cam bubbles, talk naturally while the movie plays (it gets a little quieter when your partner speaks), and send floating hearts and laughs without pausing.</p>
+            <ul class="ticks">
+              <li>Voice &amp; video call built in, no other app needed</li>
+              <li>Separate volume for the movie and the call</li>
+              <li>Drag the face-cam bubbles to any corner</li>
+            </ul>
+          </div>
+        </section>
+      </div>
+
+      <!-- Feature grid -->
+      <section class="section" aria-labelledby="all-title">
+        <div class="section-head">
+          <span class="kicker">Everything included</span>
+          <h2 id="all-title">All the features. None of the hassle.</h2>
+        </div>
+        <ul class="grid">
+          <li><svg><use href="#i-tag" /></svg><b>Free to use</b><span>No subscription, no trial, no hidden payments.</span></li>
+          <li><svg><use href="#i-person" /></svg><b>No sign-in or sign-up</b><span>Just type a name. No email or phone number.</span></li>
+          <li><svg><use href="#i-folder" /></svg><b>Your own files</b><span>Watch videos saved on your phone or computer.</span></li>
+          <li><svg><use href="#i-cloud-off" /></svg><b>Nothing uploaded</b><span>Streams device to device. No waiting, no limits.</span></li>
+          <li><svg><use href="#i-shield" /></svg><b>End-to-end encrypted</b><span>Movie, voice and video are private to you two.</span></li>
+          <li><svg><use href="#i-bolt" /></svg><b>Starts in seconds</b><span>Press play and you're both watching almost instantly.</span></li>
+          <li><svg><use href="#i-sync" /></svg><b>Shared sync controls</b><span>Both can play, pause and seek; screens stay matched.</span></li>
+          <li><svg><use href="#i-wifi" /></svg><b>Auto quality</b><span>Adapts to Wi-Fi, 4G or slower networks automatically.</span></li>
+          <li><svg><use href="#i-mic" /></svg><b>Voice &amp; video call</b><span>Talk and see each other while you watch.</span></li>
+          <li><svg><use href="#i-smile" /></svg><b>Live reactions</b><span>Send hearts and laughs that float across the screen.</span></li>
+          <li><svg><use href="#i-phone" /></svg><b>Works everywhere</b><span>Phone, tablet or laptop, right in the browser.</span></li>
+          <li><svg><use href="#i-film" /></svg><b>Any video format</b><span>MP4, MKV, MOV, WebM, 4K and HEVC phone videos.</span></li>
+        </ul>
+      </section>
+
+      <!-- Comparison -->
+      <section class="section" aria-labelledby="why-title">
+        <div class="section-head">
+          <span class="kicker">Why Duet Watch?</span>
+          <h2 id="why-title">Better than sharing your screen on a video call</h2>
+          <p>Screen sharing was made for slides, not movies. Here's the difference.</p>
+        </div>
+        <div class="compare-wrap">
+          <table class="compare">
+            <thead>
+              <tr><th scope="col"></th><th scope="col" class="us">Duet Watch</th><th scope="col">Screen sharing</th><th scope="col">Upload &amp; share sites</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Picture quality</th><td class="us yes">Up to original</td><td class="no">Often blurry</td><td class="mid">Re-compressed</td></tr>
+              <tr><th scope="row">Smooth video &amp; clear movie sound</th><td class="us yes">Yes</td><td class="no">Often choppy</td><td class="yes">Yes</td></tr>
+              <tr><th scope="row">No uploading or waiting</th><td class="us yes">Yes</td><td class="yes">Yes</td><td class="no">Upload first</td></tr>
+              <tr><th scope="row">No copy stored on a server</th><td class="us yes">Yes</td><td class="mid">Depends</td><td class="no">Stored online</td></tr>
+              <tr><th scope="row">Both can pause &amp; seek</th><td class="us yes">Yes</td><td class="no">Host only</td><td class="mid">Separately</td></tr>
+              <tr><th scope="row">Free, no account</th><td class="us yes">Yes</td><td class="mid">Account needed</td><td class="mid">Account needed</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="section faq" id="faq" aria-labelledby="faq-title">
+        <div class="section-head">
+          <span class="kicker">FAQ</span>
+          <h2 id="faq-title">Questions, answered</h2>
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary>Is Duet Watch really free?</summary>
+            <p>Yes. Duet Watch is free to use. There's no subscription, no trial and no account. Because videos go directly between your devices, there are no big video-hosting costs to pass on to you.</p>
+          </details>
+          <details>
+            <summary>Do I need to sign up or install an app?</summary>
+            <p>No. Open the website, type your name and create or join a room. It works in modern browsers like Chrome, Edge and Safari on phones, tablets and computers.</p>
+          </details>
+          <details>
+            <summary>Is my movie uploaded anywhere?</summary>
+            <p>No. The video file stays on the host's device and is streamed directly to the other person while you watch. Our server never receives the video, and nothing is stored after you leave.</p>
+          </details>
+          <details>
+            <summary>Is it private and secure?</summary>
+            <p>Yes. The movie, your voice, your camera video and your reactions are end-to-end encrypted between your two devices using WebRTC (DTLS-SRTP). Our server only helps your devices connect. It sees a room code and the names you type, never what you watch or say. Read more in our <a href="/privacy">Privacy Policy</a>.</p>
+          </details>
+          <details>
+            <summary>Which video formats can I play?</summary>
+            <p>Most of them: MP4, M4V, MOV, MKV, WebM and more, including 4K phone recordings, HEVC/H.265 video and AC-3, E-AC-3 and DTS sound. If your partner's device can't play a format directly, Duet Watch converts it on the fly.</p>
+          </details>
+          <details>
+            <summary>What internet speed do we need?</summary>
+            <p>For HD, about 3–10 Mbps of upload speed on the host's side works well. On slower connections, auto quality lowers the picture so playback keeps going; it works from around 1 Mbps. Wi-Fi gives the best results, and 4G works too.</p>
+          </details>
+          <details>
+            <summary>How many people can watch together?</summary>
+            <p>Duet Watch is made for two people: you and your partner, friend or family member. That keeps the connection direct, private and in high quality.</p>
+          </details>
+          <details>
+            <summary>What happens if the connection drops?</summary>
+            <p>Just open the link again. Duet Watch reconnects you to the same room and resumes the movie from where you left off, for both of you.</p>
+          </details>
+          <details>
+            <summary>Can I watch any movie with Duet Watch?</summary>
+            <p>Only share videos you own or have the right to watch and share, such as your own recordings or files you're licensed to use. You're responsible for what you play. See our <a href="/terms">Terms of Service</a>.</p>
+          </details>
+        </div>
+      </section>
+
+      <!-- Final call to action -->
+      <section class="cta" aria-labelledby="cta-title">
+        <h2 id="cta-title">Ready for movie night?</h2>
+        <p>Create a room, send the link and press play together. It's free.</p>
+        <a class="btn primary" href="#home-card" id="cta-start"><svg><use href="#i-play" /></svg> Start a room now</a>
+      </section>
+
+      <footer class="site-footer">
+        <div class="footer-brand">
+          <a class="brand small" href="/"><img src="/icon.svg" alt="" width="32" height="32" /><span>Duet <em>Watch</em></span></a>
+          <p>Watch movies and videos together, privately, from your own device. Free, with no sign-up.</p>
+        </div>
+        <nav class="footer-links" aria-label="Footer">
+          <div><b>Product</b><a href="#how">How it works</a><a href="#features">Features</a><a href="#faq">FAQ</a></div>
+          <div><b>Legal</b><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a></div>
+          <div><b>Maker</b><a href="https://sumitbaweza.com" target="_blank" rel="noopener">Sumit Baweza</a></div>
+        </nav>
+        <p class="footer-copy">© 2026 Duet Watch · Made with ❤️ for movie nights apart</p>
+      </footer>
     </main>
+
+    <!-- Terms acceptance (shown once per device before starting or joining a room) -->
+    <div id="terms-modal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="terms-title" aria-describedby="terms-desc">
+        <div class="modal-icon"><svg><use href="#i-shield" /></svg></div>
+        <h2 id="terms-title">Before you start</h2>
+        <p id="terms-desc" class="modal-sub">A quick look at how Duet Watch works and what you agree to.</p>
+        <ul class="modal-points">
+          <li><svg><use href="#i-check" /></svg><span>Only play videos you <b>own or have the right</b> to watch and share.</span></li>
+          <li><svg><use href="#i-check" /></svg><span>Your movie, voice and video go <b>directly to your partner</b>, encrypted, never to our server.</span></li>
+          <li><svg><use href="#i-check" /></svg><span>We keep <b>no account and no copy</b> of anything you watch or say.</span></li>
+          <li><svg><use href="#i-check" /></svg><span>Be respectful: don't use Duet Watch for anything illegal or harmful.</span></li>
+        </ul>
+        <p class="modal-legal">By tapping Accept, you agree to the <a href="/terms" target="_blank" rel="noopener">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+        <div class="modal-actions">
+          <button id="terms-cancel" class="btn ghost" type="button">Not now</button>
+          <button id="terms-accept" class="btn primary" type="button">Accept &amp; create room</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ============================== Room / player ============================== -->
     <main id="room" class="room" hidden>

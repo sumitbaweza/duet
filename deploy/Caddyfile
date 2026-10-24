@@ -1,8 +1,14 @@
 # /etc/caddy/Caddyfile
-# Caddy gets and renews the HTTPS certificate automatically and proxies to the Node app.
+# Caddy gets and renews the HTTPS certificates automatically and proxies to the Node app.
 # WebSockets (Socket.io) pass through reverse_proxy with no extra config.
 
-duet.sumitbaweza.com {
+duetwatch.com {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:3000
+}
+
+# www and the old address send visitors (and search engines) to the main one, keeping the path,
+# so old invite links like duet.sumitbaweza.com/?room=ABC234 still work.
+www.duetwatch.com, duet.sumitbaweza.com {
+	redir https://duetwatch.com{uri} permanent
 }

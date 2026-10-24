@@ -23,7 +23,8 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, { maxHttpBufferSize: 64 * 1024 });
 
 app.disable('x-powered-by');
-app.use(express.static(path.join(ROOT, 'public')));
+// extensions: /terms and /privacy serve terms.html and privacy.html
+app.use(express.static(path.join(ROOT, 'public'), { extensions: ['html'] }));
 app.use('/vendor/mp4box', express.static(path.join(ROOT, 'node_modules/mp4box/dist')));
 // MKV/WebM/AC-3/DTS support, loaded by the browser only when a file needs it.
 app.use('/vendor/mediabunny', express.static(path.join(ROOT, 'node_modules/mediabunny/dist/bundles')));
@@ -81,6 +82,10 @@ function newCode() {
 const newToken = () => randomBytes(16).toString('hex');
 const cleanName = (n) => String(n ?? '').trim().replace(/\s+/g, ' ').slice(0, 24);
 const NAME_REQUIRED = { ok: false, error: 'Please enter your name.', field: 'name' };
+// Version of the Terms of Service / Privacy Policy people must accept to start or join a room
+// (keep in step with TERMS_VERSION in public/js/main.js).
+const TERMS_VERSION = '2026-10-24';
+const TERMS_REQUIRED = { ok: false, error: 'Please accept the Terms of Service and Privacy Policy to continue.', field: 'terms' };
 
 function otherMember(room, role) {
   return role === 'host' ? room.members.guest : room.members.host;
@@ -125,6 +130,7 @@ io.on('connection', (socket) => {
     if (typeof ack !== 'function') return;
     const name = cleanName(payload?.name);
     if (!name) return ack(NAME_REQUIRED);
+    if (payload?.terms !== TERMS_VERSION) return ack(TERMS_REQUIRED);
     leaveCurrentRoom(socket);
     const room = {
       code: newCode(),
@@ -160,6 +166,7 @@ io.on('connection', (socket) => {
     if (room.members.guest) return ack({ ok: false, error: 'This room already has two people.' });
     const name = cleanName(payload?.name);
     if (!name) return ack(NAME_REQUIRED);
+    if (payload?.terms !== TERMS_VERSION) return ack(TERMS_REQUIRED);
     leaveCurrentRoom(socket);
     room.members.guest = { token: newToken(), socketId: null, name };
     ack(attach(socket, room, 'guest'));

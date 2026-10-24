@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0a10" />
+    <title>Privacy Policy · Duet Watch</title>
+    <meta name="description" content="How Duet Watch handles your data: your movie, voice and video never reach our server. No accounts, no ads, no tracking cookies." />
+    <link rel="canonical" href="https://duetwatch.com/privacy" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <div class="legal-page">
+      <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+      <nav class="legal-nav" aria-label="Main">
+        <a class="brand small" href="/"><img src="/icon.svg" alt="" width="32" height="32" /><span>Duet <em>Watch</em></span></a>
+        <a class="btn primary" href="/">Start watching</a>
+      </nav>
+
+      <main class="legal">
+        <h1>Privacy Policy</h1>
+        <p class="updated">Effective 24 October 2026</p>
+
+        <div class="summary">
+          <p><b>In short:</b> your movie, voice, video and reactions go directly between you and your partner, encrypted, and never reach our server. We don't ask for an account, show ads or use tracking cookies. Our server only briefly keeps what it needs to connect you.</p>
+        </div>
+
+        <h2>1. What never reaches us</h2>
+        <ul>
+          <li>The video files you play, their names or their contents.</li>
+          <li>Your voice, your camera video and your reactions.</li>
+          <li>Account details: there are no accounts, so no email, phone number or password.</li>
+        </ul>
+        <p>All of these travel directly between the two devices in a room using WebRTC, which encrypts them end to end (DTLS-SRTP).</p>
+
+        <h2>2. What our server handles to connect you</h2>
+        <ul>
+          <li><b>Room information:</b> the 6-letter room code, the names you type and a random rejoin code. This is kept only in the server's memory while the room exists, and deleted when the host leaves or after at most 6 hours. It is never written to disk.</li>
+          <li><b>Connection setup messages:</b> to connect your two devices, our server passes technical messages between them (such as network addresses and supported video formats). These are passed along and not stored.</li>
+          <li><b>IP address:</b> like any website, our server sees your IP address while you're connected. Our web server and app don't keep access logs of visits.</li>
+          <li><b>Relay logs:</b> when a direct connection between you isn't possible, the traffic goes through our relay (TURN) server. It can only see encrypted data, never what you watch or say. The relay records connection logs (IP addresses and times) for security and troubleshooting, and these are deleted automatically within 14 days.</li>
+        </ul>
+
+        <h2>3. Stored on your own device</h2>
+        <p>Duet Watch saves a few things in your browser's storage so the app works smoothly. They never leave your device:</p>
+        <ul>
+          <li>your name, your volume levels and that you accepted these terms;</li>
+          <li>while you're in a room, the room code and rejoin code (cleared when you close the tab);</li>
+          <li>on some phones that can't read a video file directly, a temporary private copy of the movie, which is deleted when you pick another movie or open Duet Watch again.</li>
+        </ul>
+        <p>You can delete all of this at any time by clearing this site's data in your browser settings. We don't use cookies.</p>
+
+        <h2>4. Camera and microphone</h2>
+        <p>Duet Watch only uses your camera or microphone when you turn them on, and only to send them directly to the other person in your room. We never record or store them. Please remember that the other person could still record their own screen, so only share what you're comfortable with.</p>
+
+        <h2>5. Services we rely on</h2>
+        <ul>
+          <li><b>DigitalOcean</b> hosts our server and relay in Bangalore, India.</li>
+          <li><b>Google STUN servers</b> help your devices find a direct route to each other. They see your IP address when used, under Google's own privacy policy.</li>
+        </ul>
+        <p>We don't use analytics, advertising or social-media trackers, and our fonts are served from our own server. We don't sell or share your data with anyone.</p>
+
+        <h2>6. Children</h2>
+        <p>Duet Watch is not meant for children under 13, and we don't knowingly collect any personal data from them.</p>
+
+        <h2>7. Your rights</h2>
+        <p>Because we don't have accounts and keep only temporary room data and short-lived relay logs, there is usually nothing stored that we could show you or delete. If you have a question or request about your data, contact us and we'll help.</p>
+
+        <h2>8. Changes to this policy</h2>
+        <p>If we change how we handle data, we'll update this page and the date above. For important changes, we'll ask you to accept again before you start or join a room.</p>
+
+        <h2>9. Contact</h2>
+        <p>Get in touch through <a href="https://sumitbaweza.com" target="_blank" rel="noopener">sumitbaweza.com</a>.</p>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-brand">
+          <a class="brand small" href="/"><img src="/icon.svg" alt="" width="32" height="32" /><span>Duet <em>Watch</em></span></a>
+          <p>Watch movies and videos together, privately, from your own device. Free, with no sign-up.</p>
+        </div>
+        <nav class="footer-links" aria-label="Footer">
+          <div><b>Product</b><a href="/#how">How it works</a><a href="/#features">Features</a><a href="/#faq">FAQ</a></div>
+          <div><b>Legal</b><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a></div>
+          <div><b>Maker</b><a href="https://sumitbaweza.com" target="_blank" rel="noopener">Sumit Baweza</a></div>
+        </nav>
+        <p class="footer-copy">© 2026 Duet Watch · Made with ❤️ for movie nights apart</p>
+      </footer>
+    </div>
+  </body>
+</html>
