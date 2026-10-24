@@ -8,6 +8,7 @@ import { PlayerUI } from './player-ui.js';
 import { LocalPlayer } from './local-player.js';
 import { CompatSender, canCapture } from './compat.js';
 import { readableFile, clearMovieCopies } from './file-access.js';
+import { movieTitle, embeddedTitle } from './movie-title.js';
 
 const $ = (id) => document.getElementById(id);
 const video = $('video');
@@ -154,15 +155,17 @@ $('join-form').onsubmit = (e) => {
   });
 };
 
-// Terms of Service / Privacy Policy: accepted once per device, and again whenever they change
-// (bump TERMS_VERSION here and in server/index.js together).
+// Terms of Service / Privacy Policy: accepted every time someone starts or joins a room (not
+// remembered on the device). The server checks the version too: bump TERMS_VERSION here and in
+// server/index.js together when the terms change.
 const TERMS_VERSION = '2026-10-24';
-const TERMS_KEY = 'duet:terms';
+try {
+  localStorage.removeItem('duet:terms'); // older versions remembered the acceptance
+} catch {}
 let termsProceed = null;
 let termsReturnFocus = null;
 
 function withTerms(acceptLabel, proceed) {
-  if (safeGet(localStorage, TERMS_KEY) === TERMS_VERSION) return proceed();
   termsProceed = proceed;
   termsReturnFocus = document.activeElement;
   $('terms-accept').textContent = acceptLabel;
@@ -178,7 +181,6 @@ function closeTerms() {
 }
 $('terms-accept').onclick = () => {
   const proceed = termsProceed;
-  safeSet(localStorage, TERMS_KEY, TERMS_VERSION);
   closeTerms();
   proceed?.();
 };
@@ -250,10 +252,7 @@ async function onJoined(res) {
   dlog('joined', res?.ok, res?.role, 'peerOnline', res?.peerOnline);
   if (!res?.ok) {
     if (res?.field === 'name') return requireName();
-    if (res?.field === 'terms') {
-      safeSet(localStorage, TERMS_KEY, ''); // the server has newer terms: ask again
-      return showHomeError(res.error);
-    }
+    if (res?.field === 'terms') return showHomeError(res.error); // e.g. a page from before a terms update
     return showHomeError(res?.error || 'Something went wrong.');
   }
   const reconnect = state.code === res.state.code;
@@ -383,7 +382,7 @@ function startPeer() {
     // The host picked a movie: show its name right away (even if it ends up in compatibility mode).
     player.addEventListener('movie', (e) => {
       $('stat-file').textContent = `${e.detail.name} · ${formatBytes(e.detail.size)}`;
-      setNowPlaying(e.detail.name);
+      onMovieAnnounced(e.detail);
     });
     player.addEventListener('meta', (e) => {
       state.compatPending = false;
@@ -479,13 +478,58 @@ function teardownPeer({ keepPendingSignals = false } = {}) {
 }
 
 /** Show the movie's name at the top of the player ("Gajab.Raat.2026.720p.mkv" → "Gajab Raat 2026 720p"). */
-function setNowPlaying(fileName) {
-  let title = (fileName || '').replace(/\.[a-z0-9]{2,4}$/i, '');
-  if (!/\s/.test(title)) title = title.replace(/[._]+/g, ' ');
-  title = title.trim();
-  $('np-title').textContent = title;
-  $('np-title').title = fileName || '';
+/** Show the movie's title at the top of the player (null hides it). The file name goes in the tooltip. */
+function setNowPlaying(title, fileName = '') {
+  $('np-title').textContent = title || '';
+  $('np-title').title = fileName;
   $('now-playing').hidden = !title;
+  $('np-edit').hidden = !title || state.role !== 'host' || !$('np-input').hidden;
+}
+
+// Host: rename the movie (phone galleries only give numbered file names). The new name goes to the
+// partner over the direct connection, and into the movie info sent on every (re)connect.
+function startRename() {
+  if (state.role !== 'host' || !state.title) return;
+  const input = $('np-input');
+  input.value = state.title;
+  input.hidden = false;
+  $('np-edit').hidden = true;
+  $('now-playing').classList.add('editing');
+  ui.hold('rename', true);
+  input.focus();
+  input.select();
+}
+function finishRename(save) {
+  const input = $('np-input');
+  if (input.hidden) return;
+  const value = input.value.trim().replace(/\s+/g, ' ').slice(0, 80);
+  input.hidden = true;
+  $('now-playing').classList.remove('editing');
+  ui.hold('rename', false);
+  if (save && value && value !== state.title) {
+    state.title = value;
+    state.peer?.sendControl({ t: 'title', title: value });
+  }
+  setNowPlaying(state.title, state.file?.name);
+}
+$('np-edit').onclick = (e) => {
+  e.stopPropagation();
+  startRename();
+};
+$('np-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') finishRename(true);
+  else if (e.key === 'Escape') finishRename(false);
+});
+$('np-input').addEventListener('blur', () => finishRename(true));
+
+/** Guest: the host announced a movie. Show its title, and say so when it's a switch. */
+function onMovieAnnounced({ name, size, title }) {
+  const key = `${name}|${size}`;
+  const shown = title || movieTitle(name); // older hosts send only the file name
+  const switched = state.movieKey && state.movieKey !== key;
+  state.movieKey = key;
+  setNowPlaying(shown, name);
+  if (switched) toast(`Now playing: ${shown}`, 4000);
 }
 
 function onControl(msg) {
@@ -527,6 +571,14 @@ function onControl(msg) {
       state.guestStatus = msg;
       state.streamer?.updateGuestStatus(msg);
       break;
+    case 'title': {
+      // The host renamed the movie.
+      const title = typeof msg.title === 'string' ? msg.title.trim().replace(/\s+/g, ' ').slice(0, 80) : '';
+      if (state.role !== 'guest' || !title) break;
+      setNowPlaying(title, $('np-title').title);
+      toast(`${state.peerName || 'Your partner'} named the movie: ${title}`, 3500);
+      break;
+    }
     case 'react':
       floatReaction(msg.emoji);
       break;
@@ -599,6 +651,7 @@ async function loadFile(file) {
     }
   }
   if (state.loading !== loading) return;
+  const embedded = embeddedTitle(file); // read alongside the probe below
   // Validate before telling the partner anything.
   const probe = new HostStreamer(file);
   let meta;
@@ -618,7 +671,11 @@ async function loadFile(file) {
   state.compatSender?.stop();
   state.compatSender = null;
   state.file = file;
-  setNowPlaying(file.name); // now, not after loading: the old movie is being replaced from here on
+  // Title now, not after loading: the old movie is being replaced from here on. Phone galleries
+  // only give numbered file names, so prefer the title inside the file, else date and length.
+  const titleInfo = { embedded: await embedded, lastModified: file.lastModified, duration: meta?.duration };
+  state.title = movieTitle(file.name, titleInfo);
+  setNowPlaying(state.title, file.name);
   state.nativeOnly = nativeOnly;
   state.duration = 0; // the new movie's length is known once its metadata loads
   // A new movie starts paused. Done before the loading below so a "play" pressed meanwhile sticks.
@@ -642,6 +699,11 @@ async function loadFile(file) {
     video.src = state.fileUrl;
     await once(video, 'loadedmetadata');
     state.duration = video.duration;
+  }
+  if (!titleInfo.duration && state.duration && state.loading === loading) {
+    // Played directly by the browser: its length is only known now.
+    state.title = movieTitle(file.name, { ...titleInfo, duration: state.duration });
+    setNowPlaying(state.title, file.name);
   }
   $('stat-file').textContent = `${file.name} · ${formatBytes(file.size)}`;
   if (state.peer?.isOpen) startStreaming();
@@ -696,7 +758,7 @@ async function startStreaming() {
     const meta = await streamer.probe();
     if (peer.video.readyState !== 'open') await once(peer.video, 'open');
     if (streamer !== state.streamer) return;
-    peer.video.send(JSON.stringify(meta));
+    peer.video.send(JSON.stringify({ ...meta, title: state.title }));
   } catch (err) {
     toast(err.message, 10000);
   }
@@ -718,7 +780,7 @@ function startCompat(reason) {
   state.streamer = null;
   state.compatSender?.stop();
   state.compatSender = new CompatSender(peer, video);
-  state.compatSender.start({ duration: state.duration, name: state.file.name, size: state.file.size });
+  state.compatSender.start({ duration: state.duration, name: state.file.name, size: state.file.size, title: state.title });
   $('stat-stream').textContent = 'Live (compatibility mode)';
   state.abr = null;
   renderQuality();
@@ -739,7 +801,7 @@ function enterCompat(msg) {
   state.peer.compatStreamId = msg.streamId;
   state.duration = msg.duration;
   $('stat-file').textContent = `${msg.name} · ${formatBytes(msg.size)} · live (compatibility mode)`;
-  setNowPlaying(msg.name);
+  onMovieAnnounced(msg);
   video.removeAttribute('src');
   state.sync?.setRemoteControl(true);
   state.peer.sendControl({ t: 'compat-ready' });

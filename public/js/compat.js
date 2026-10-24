@@ -29,11 +29,11 @@ export class CompatSender {
   }
 
   /** Announce compatibility mode; tracks are attached when the guest says it's ready. */
-  start({ duration, name, size }) {
+  start({ duration, name, size, title }) {
     const v = this.video;
     this.stream = v.captureStream ? v.captureStream() : v.mozCaptureStream();
     this.stream.addEventListener('addtrack', () => this.attachTracks());
-    this.peer.sendControl({ t: 'compat', on: true, streamId: this.stream.id, duration, name, size });
+    this.peer.sendControl({ t: 'compat', on: true, streamId: this.stream.id, duration, name, size, title });
   }
 
   onReady() {

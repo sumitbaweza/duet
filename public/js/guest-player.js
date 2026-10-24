@@ -149,7 +149,7 @@ export class GuestPlayer extends EventTarget {
 
   handleMeta(meta) {
     // Announce the new movie first, whether or not this browser turns out to be able to decode it.
-    this.dispatchEvent(new CustomEvent('movie', { detail: { name: meta.name, size: meta.size } }));
+    this.dispatchEvent(new CustomEvent('movie', { detail: { name: meta.name, size: meta.size, title: meta.title } }));
     this.teardownMedia();
     this.meta = meta;
     this.gen = 0; // a new file means a new HostStreamer counting from 0

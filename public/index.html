@@ -106,6 +106,7 @@
       <symbol id="i-tv" viewBox="0 0 24 24"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></symbol>
       <symbol id="i-person" viewBox="0 0 24 24"><path fill="currentColor" d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
       <symbol id="i-tag" viewBox="0 0 24 24"><path fill="currentColor" d="m21.41 11.58-9-9A2 2 0 0 0 11 2H4a2 2 0 0 0-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
       <symbol id="i-folder" viewBox="0 0 24 24"><path fill="currentColor" d="M10 4H4a2 2 0 0 0-1.99 2L2 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></symbol>
       <symbol id="i-cloud-off" viewBox="0 0 24 24"><path fill="currentColor" d="M19.35 10.04A7.49 7.49 0 0 0 12 4c-1.48 0-2.85.43-4.01 1.17l1.46 1.46A5.5 5.5 0 0 1 17.5 11v.5H19a3 3 0 0 1 1.44 5.62l1.45 1.45A4.96 4.96 0 0 0 24 14.5c0-2.64-2.05-4.78-4.65-4.96zM3 5.27l2.75 2.74C2.56 8.15 0 10.77 0 14a6 6 0 0 0 6 6h11.73l2 2L21 20.73 4.27 4 3 5.27zM7.73 10l8 8H6a4 4 0 0 1 0-8h1.73z"/></symbol>
@@ -486,7 +487,7 @@
       </footer>
     </main>
 
-    <!-- Terms acceptance (shown once per device before starting or joining a room) -->
+    <!-- Terms acceptance (shown every time before starting or joining a room) -->
     <div id="terms-modal" class="modal" hidden>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="terms-title" aria-describedby="terms-desc">
         <div class="modal-icon"><svg><use href="#i-shield" /></svg></div>
@@ -558,6 +559,8 @@
             <svg aria-hidden="true"><use href="#i-film" /></svg>
             <span class="np-label">Now playing</span>
             <span id="np-title" class="np-title"></span>
+            <input id="np-input" class="np-input" maxlength="80" aria-label="Movie name" enterkeyhint="done" hidden />
+            <button id="np-edit" class="np-edit" type="button" aria-label="Rename this movie" title="Rename this movie" hidden><svg><use href="#i-edit" /></svg></button>
           </div>
         </header>
 
