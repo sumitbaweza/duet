@@ -539,6 +539,25 @@ svg { width: 22px; height: 22px; flex: none; }
 .modal-actions .btn.primary { font-size: 15px; }
 body.modal-open { overflow: hidden; }
 
+/* Guest: "host left the room" card */
+.ended-card { text-align: center; width: min(100%, 400px); }
+.ended-avatar {
+  position: relative; display: grid; place-items: center; width: 76px; height: 76px; margin: 4px auto 18px; border-radius: 50%;
+  font-family: "Space Grotesk", var(--font); font-size: 32px; font-weight: 700; color: #fff;
+  background: var(--accent-grad); box-shadow: 0 0 0 8px rgb(255 79 139 / 0.12), 0 16px 36px rgb(255 79 139 / 0.35);
+}
+.ended-avatar i {
+  position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--surface-solid); border: 2px solid var(--surface-solid); box-shadow: 0 0 0 1px var(--line-strong);
+}
+.ended-avatar i svg { width: 16px; height: 16px; color: var(--muted); }
+.ended-card .modal-sub { margin: 8px 0 18px; font-size: 15px; line-height: 1.5; }
+.ended-tip {
+  display: flex; gap: 10px; align-items: flex-start; margin: 0 0 20px; padding: 12px 14px; border-radius: 12px; text-align: left;
+  font-size: 13px; color: var(--muted); background: rgb(255 255 255 / 0.05);
+}
+.ended-tip svg { width: 18px; height: 18px; flex: none; color: var(--accent); }
+
 @media (max-width: 960px) {
   .nav-links { display: none; }
   .intro, .row { grid-template-columns: 1fr; gap: 34px; }

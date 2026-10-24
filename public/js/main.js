@@ -303,6 +303,7 @@ socket.on('peer-joined', ({ name }) => {
 
 socket.on('peer-left', ({ permanent }) => {
   toast(permanent ? 'Your partner left the room' : 'Your partner disconnected — waiting for them…');
+  state.lastPeerName = state.peerName ?? state.lastPeerName; // for the "room ended" card that may follow
   setPartner(null);
   // Hold the movie so nobody misses a scene; it resumes once they're back and buffered.
   if (state.role === 'host' && !video.paused) {
@@ -314,11 +315,30 @@ socket.on('peer-left', ({ permanent }) => {
 });
 
 socket.on('room-closed', () => {
+  const host = state.peerName || state.lastPeerName;
   clearSession();
   teardownPeer();
-  alert('This room was closed.');
-  location.href = '/';
+  voice.stop();
+  camera.stop();
+  video.pause();
+  showRoomEnded(host);
 });
+
+/** Guest: the host ended the room. Say who left, and offer the way out. */
+function showRoomEnded(hostName) {
+  const raw = hostName?.trim();
+  const name = raw && raw[0].toUpperCase() + raw.slice(1);
+  $('ended-initial').textContent = (name?.[0] || '?').toUpperCase();
+  $('ended-title').textContent = name ? `${name} left the room` : 'The host left the room';
+  $('ended-desc').textContent = `${name || 'They'} ended this movie night, so the room is now closed. Thanks for watching together!`;
+  $('toast').hidden = true; // the "partner left" toast would sit on top of the card
+  $('ended-modal').hidden = false;
+  document.body.classList.add('modal-open');
+  $('ended-leave').focus();
+}
+$('ended-leave').onclick = () => {
+  location.href = '/';
+};
 
 $('leave').onclick = () => {
   socket.emit('leave-room');
@@ -1131,7 +1151,7 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if ($('room').hidden || e.target.tagName === 'INPUT') return;
+  if ($('room').hidden || e.target.tagName === 'INPUT' || !$('ended-modal').hidden) return;
   const seekBy = (delta) => {
     state.sync?.seek(Math.max(0, video.currentTime + delta));
     ui.flashRipple(delta < 0 ? 'left' : 'right', Math.abs(delta));

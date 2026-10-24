@@ -664,6 +664,17 @@
       </section>
     </main>
 
+    <!-- Guest: the host ended the room -->
+    <div id="ended-modal" class="modal" hidden>
+      <div class="modal-card ended-card" role="alertdialog" aria-modal="true" aria-labelledby="ended-title" aria-describedby="ended-desc">
+        <div class="ended-avatar"><span id="ended-initial">?</span><i aria-hidden="true"><svg><use href="#i-leave" /></svg></i></div>
+        <h2 id="ended-title">The host left the room</h2>
+        <p id="ended-desc" class="modal-sub">They ended this movie night, so the room is now closed. Thanks for watching together!</p>
+        <p class="ended-tip"><svg aria-hidden="true"><use href="#i-heart" /></svg><span>Want to keep watching? Start your own room and send them the link.</span></p>
+        <button id="ended-leave" class="btn primary wide" type="button"><svg><use href="#i-leave" /></svg> Leave room</button>
+      </div>
+    </div>
+
     <div id="toast" class="toast" role="status" hidden></div>
 
     <script src="/socket.io/socket.io.min.js"></script>
