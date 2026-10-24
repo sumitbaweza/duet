@@ -33,6 +33,7 @@ for (const ext of ['ac3', 'dts', 'aac-encoder']) {
 }
 // Local testing only: lets automated tests load sample clips without a file picker.
 if (process.env.DUET_TEST_MEDIA === '1') app.use('/test-media', express.static(path.join(ROOT, 'test-media')));
+if (process.env.DUET_TEST_MEDIA === '1') app.use('/promo', express.static(path.join(ROOT, 'promo'))); // intro video source
 app.get('/healthz', (_req, res) => res.json({ ok: true, rooms: rooms.size }));
 
 // ICE servers. STUN is free; TURN is needed when either side is behind a strict NAT
@@ -163,7 +164,9 @@ io.on('connection', (socket) => {
         return ack(attach(socket, room, role));
       }
     }
-    if (room.members.guest) return ack({ ok: false, error: 'This room already has two people.' });
+    // The second seat is only taken while its person is connected. If they went away without
+    // leaving (closed the tab, lost signal, switched phones), whoever joins now gets the seat.
+    if (room.members.guest?.socketId) return ack({ ok: false, error: 'This room already has two people.' });
     const name = cleanName(payload?.name);
     if (!name) return ack(NAME_REQUIRED);
     if (payload?.terms !== TERMS_VERSION) return ack(TERMS_REQUIRED);
@@ -180,7 +183,10 @@ io.on('connection', (socket) => {
     if (other?.socketId) io.to(other.socketId).emit('signal', data);
   });
 
-  socket.on('leave-room', () => leaveCurrentRoom(socket, true));
+  socket.on('leave-room', (ack) => {
+    leaveCurrentRoom(socket, true);
+    if (typeof ack === 'function') ack(); // the page waits for this before reloading
+  });
   socket.on('disconnect', () => leaveCurrentRoom(socket));
 });
 

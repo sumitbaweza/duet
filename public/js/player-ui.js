@@ -127,9 +127,15 @@ export class PlayerUI {
     g.addEventListener('dblclick', (e) => e.preventDefault());
   }
 
+  /** Position of a pointer along an element, 0..1 from its left edge, also when the player is
+   *  rotated sideways for fullscreen on an upright phone (its left edge is then at the top). */
+  along(e, el) {
+    const r = el.getBoundingClientRect();
+    return this.stage.classList.contains('rotated') ? (e.clientY - r.top) / r.height : (e.clientX - r.left) / r.width;
+  }
+
   handleTap(e) {
-    const rect = this.stage.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
+    const x = this.along(e, this.stage);
     const zone = x < SIDE_ZONE ? 'left' : x > 1 - SIDE_ZONE ? 'right' : 'center';
     const touch = e.pointerType !== 'mouse';
     const now = performance.now();
@@ -200,8 +206,7 @@ export class PlayerUI {
   bindTimeline() {
     const tl = this.el.timeline;
     const timeAt = (e) => {
-      const r = tl.getBoundingClientRect();
-      const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      const f = Math.min(1, Math.max(0, this.along(e, tl)));
       return { f, t: f * (this.getDuration() || 0) };
     };
     const showHover = (e) => {
@@ -209,9 +214,9 @@ export class PlayerUI {
       const tip = this.el.hoverTime;
       tip.hidden = false;
       tip.textContent = formatTime(t);
-      const r = tl.getBoundingClientRect();
+      const width = tl.offsetWidth; // unrotated length of the timeline
       const half = tip.offsetWidth / 2;
-      tip.style.left = `${Math.min(r.width - half, Math.max(half, f * r.width))}px`;
+      tip.style.left = `${Math.min(width - half, Math.max(half, f * width))}px`;
     };
 
     tl.addEventListener('pointerdown', (e) => {

@@ -340,12 +340,20 @@ $('ended-leave').onclick = () => {
 };
 
 $('leave').onclick = () => {
-  socket.emit('leave-room');
   clearSession();
   teardownPeer();
   voice.stop();
   camera.stop();
-  location.href = '/';
+  // Reload only once the server confirms: a reload straight after sending can cut the message off,
+  // and the server would then keep the seat for someone who has gone ("already has two people").
+  let gone = false;
+  const go = () => {
+    if (gone) return;
+    gone = true;
+    location.href = '/';
+  };
+  socket.timeout(1500).emit('leave-room', go);
+  setTimeout(go, 1600);
 };
 
 // ---------------------------------------------------------------- peer lifecycle
@@ -1161,9 +1169,15 @@ pip.addEventListener('pointerdown', (e) => {
   let moved = false;
   pip.setPointerCapture(e.pointerId);
 
-  const onMove = (ev) => {
+  // Screen movement → movement in the player's own (possibly rotated sideways) coordinates.
+  const rotated = stage.classList.contains('rotated');
+  const local = (ev) => {
     const dx = ev.clientX - start.x;
     const dy = ev.clientY - start.y;
+    return rotated ? [dy, -dx] : [dx, dy];
+  };
+  const onMove = (ev) => {
+    const [dx, dy] = local(ev);
     if (!moved && Math.hypot(dx, dy) < 6) return;
     moved = true;
     pip.classList.add('dragging');
@@ -1176,9 +1190,14 @@ pip.addEventListener('pointerdown', (e) => {
     pip.classList.remove('dragging');
     pip.style.transform = '';
     if (!moved) return void pip.classList.toggle('large');
-    const cx = rect.left + rect.width / 2 + (ev.clientX - start.x) - stageRect.left;
-    const cy = rect.top + rect.height / 2 + (ev.clientY - start.y) - stageRect.top;
-    const corner = `corner-${cy < stageRect.height / 2 ? 't' : 'b'}${cx < stageRect.width / 2 ? 'l' : 'r'}`;
+    // Where the bubble ended up, as a fraction of the player's width / height.
+    const [dx, dy] = local(ev);
+    let fx = (rect.left + rect.width / 2 - stageRect.left) / stageRect.width;
+    let fy = (rect.top + rect.height / 2 - stageRect.top) / stageRect.height;
+    if (rotated) [fx, fy] = [fy, 1 - fx];
+    fx += dx / stage.offsetWidth;
+    fy += dy / stage.offsetHeight;
+    const corner = `corner-${fy < 0.5 ? 't' : 'b'}${fx < 0.5 ? 'l' : 'r'}`;
     pip.classList.remove('corner-tl', 'corner-tr', 'corner-bl', 'corner-br');
     pip.classList.add(corner);
     safeSet(localStorage, 'duet:pip-corner', corner);
@@ -1191,26 +1210,78 @@ pip.addEventListener('pointerdown', (e) => {
 // ---------------------------------------------------------------- fullscreen & keyboard
 
 $('fullscreen').onclick = toggleFullscreen;
-function toggleFullscreen() {
-  if (document.fullscreenElement) return document.exitFullscreen();
-  if (stage.requestFullscreen) {
-    stage
-      .requestFullscreen({ navigationUI: 'hide' })
-      .then(() => {
-        // Phones: turn sideways for the movie.
-        if (matchMedia('(pointer: coarse)').matches) screen.orientation?.lock?.('landscape').catch(() => {});
-      })
-      .catch(() => {});
-  } else if (video.webkitEnterFullscreen) {
-    video.webkitEnterFullscreen(); // iPhone
+// Fullscreen that works on every phone:
+//  - the browser's real fullscreen when it works (requested on the room, so the player inside it
+//    can still be rotated);
+//  - otherwise (iPhone, in-app browsers of WhatsApp / Instagram / Facebook, or no answer from the
+//    browser) a built-in fullscreen where the player covers the page; Back exits it;
+//  - a phone still held upright with rotation locked gets the player turned sideways, so the
+//    movie fills the screen; it turns back when the phone is physically rotated.
+const room = $('room');
+const realFullscreen = () => document.fullscreenElement || document.webkitFullscreenElement;
+const isFullscreen = () => !!realFullscreen() || room.classList.contains('pseudo-fs');
+const isPhone = () => matchMedia('(pointer: coarse)').matches;
+
+async function enterFullscreen() {
+  const request = room.requestFullscreen || room.webkitRequestFullscreen;
+  if (request) {
+    try {
+      // Some in-app browsers never answer: don't wait forever.
+      await Promise.race([
+        Promise.resolve(request.call(room, { navigationUI: 'hide' })),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('no answer')), 900)),
+      ]);
+    } catch {}
   }
+  if (!realFullscreen()) enterPseudoFullscreen();
+  else if (isPhone()) await screen.orientation?.lock?.('landscape').catch(() => {});
+  fullscreenChanged();
+  setTimeout(updateRotation, 400); // after the orientation lock (if any) has turned the screen
 }
-document.addEventListener('fullscreenchange', () => {
-  const fs = !!document.fullscreenElement;
+function exitFullscreen() {
+  if (realFullscreen()) (document.exitFullscreen || document.webkitExitFullscreen).call(document)?.catch?.(() => {});
+  if (room.classList.contains('pseudo-fs')) {
+    exitPseudoFullscreen();
+    if (history.state?.duetFullscreen) history.back(); // drop the entry Back would have used
+  }
+  fullscreenChanged();
+}
+function toggleFullscreen() {
+  if (isFullscreen()) exitFullscreen();
+  else enterFullscreen();
+}
+function enterPseudoFullscreen() {
+  room.classList.add('pseudo-fs');
+  document.documentElement.classList.add('no-scroll');
+  history.pushState({ ...(history.state || {}), duetFullscreen: true }, '');
+}
+function exitPseudoFullscreen() {
+  room.classList.remove('pseudo-fs');
+  document.documentElement.classList.remove('no-scroll');
+}
+window.addEventListener('popstate', () => {
+  // Back while in the built-in fullscreen: leave fullscreen, stay in the room.
+  if (room.classList.contains('pseudo-fs')) {
+    exitPseudoFullscreen();
+    fullscreenChanged();
+  }
+});
+function updateRotation() {
+  const upright = innerHeight > innerWidth;
+  const wideMovie = (video.videoWidth || 16) >= (video.videoHeight || 9);
+  stage.classList.toggle('rotated', isFullscreen() && isPhone() && upright && wideMovie);
+}
+function fullscreenChanged() {
+  const fs = isFullscreen();
   stage.classList.toggle('is-fullscreen', fs);
   $('fullscreen').setAttribute('aria-label', fs ? 'Exit fullscreen' : 'Fullscreen');
   if (!fs) screen.orientation?.unlock?.();
-});
+  updateRotation();
+}
+document.addEventListener('fullscreenchange', fullscreenChanged);
+document.addEventListener('webkitfullscreenchange', fullscreenChanged);
+window.addEventListener('resize', updateRotation);
+video.addEventListener('loadedmetadata', updateRotation);
 
 document.addEventListener('keydown', (e) => {
   if ($('room').hidden || e.target.tagName === 'INPUT' || !$('ended-modal').hidden) return;
@@ -1236,6 +1307,7 @@ document.addEventListener('keydown', (e) => {
     setReactOpen(false);
     setStatsOpen(false);
     setVolumeOpen(false);
+    if (room.classList.contains('pseudo-fs')) exitFullscreen(); // real fullscreen handles Esc itself
   }
 });
 
