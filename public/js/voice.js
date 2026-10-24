@@ -40,27 +40,42 @@ export class Voice extends EventTarget {
       this.remoteAudio.play().catch(() => {});
       this.watchRemote(this.remoteAudio.srcObject);
     });
-    if (this.stream) this.addTracks();
+    if (this.stream) this.sendTrack();
   }
 
   async toggleMic() {
     this.ensureAudioContext();
-    if (!this.stream) {
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      this.addTracks();
-    } else {
-      const track = this.stream.getAudioTracks()[0];
-      track.enabled = !track.enabled;
-    }
+    if (this.micOn) this.stopMic();
+    else await this.startMic();
     this.dispatchEvent(new CustomEvent('mic', { detail: this.micOn }));
     return this.micOn;
   }
 
-  addTracks() {
-    if (!this.peer || this.peer.closed) return;
-    for (const track of this.stream.getAudioTracks()) {
+  async startMic() {
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+    this.sendTrack();
+  }
+
+  /**
+   * Release the microphone completely. Only muting it would keep it open, and phones then show the
+   * browser as still using the mic (Android's green dot) even though the button says off.
+   */
+  stopMic() {
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+    for (const sender of this.senders) sender.replaceTrack(null).catch(() => {});
+  }
+
+  /** Send the mic to the partner: into the existing sender if there is one (no renegotiation). */
+  sendTrack() {
+    if (!this.peer || this.peer.closed || !this.stream) return;
+    const track = this.stream.getAudioTracks()[0];
+    if (!track) return;
+    if (this.senders.length) {
+      this.senders[0].replaceTrack(track).catch((err) => console.warn('replaceTrack', err));
+    } else {
       this.senders.push(this.peer.pc.addTrack(track, this.stream));
     }
   }
