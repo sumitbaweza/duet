@@ -907,6 +907,22 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; bo
   .pip.corner-tl, .pip.corner-tr { top: 60px; }
   .pip.corner-bl, .pip.corner-br { bottom: 96px; }
 }
+/* Phones in portrait: one row can't hold every button (it pushed fullscreen off-screen on
+   384–412 px phones, more so with a larger system font). Two rows, like mobile video apps:
+   play · time · fullscreen on top, the call/extras row below, spread evenly. */
+@media (max-width: 520px) {
+  .control-row { position: relative; flex-wrap: wrap; justify-content: space-around; row-gap: 2px; }
+  .control-row > * { order: 6; }
+  .control-row > #play { order: 1; }
+  .control-row > .time { order: 2; }
+  .control-row > .spacer { order: 3; }
+  .control-row > #fullscreen { order: 4; }
+  .control-row::before { content: ''; order: 5; flex-basis: 100%; height: 0; } /* line break */
+  /* Reactions sit near the left edge now: centre their popover on the bar instead of the button. */
+  .react-wrap { position: static; }
+  .react-pop { bottom: calc(100% + 6px); }
+  .pip.corner-bl, .pip.corner-br { bottom: 140px; }
+}
 @media (max-width: 380px) {
   #partner-name { display: none; }
   .avatar { margin-left: -4px; }
